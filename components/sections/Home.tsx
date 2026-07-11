@@ -70,27 +70,36 @@ export default function Home({ onNavigate }: { onNavigate: (id: SectionId) => vo
           </div>
         </div>
 
-        {/* Signature visual: server status card over a drifting pixel grid */}
+        {/* Signature visual: server status card over an emblem visible only through pulsing tiles */}
         <div className="relative mx-auto flex w-full max-w-md flex-col gap-4">
           <div className="glass-panel pixel-corner relative aspect-4/3 w-full overflow-hidden">
-            <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-1 p-4">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-[2px]"
-                  style={{
-                    background: `linear-gradient(135deg, hsla(${270 - (i % 6) * 14}, 80%, 60%, ${0.15 + (i % 5) * 0.12}), hsla(${190 + (i % 6) * 10}, 85%, 55%, ${0.1 + (i % 4) * 0.15}))`,
-                    animation: `pulseTile ${3 + (i % 5)}s ease-in-out ${(i % 6) * 0.15}s infinite`,
-                  }}
-                />
-              ))}
+            <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-2 p-4">
+              {Array.from({ length: 36 }).map((_, i) => {
+                const col = i % 6;
+                const row = Math.floor(i / 6);
+                const posX = (col / 5) * 100;
+                const posY = (row / 5) * 100;
+                return (
+                  <div
+                    key={i}
+                    className="rounded-[2px]"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, hsla(${270 - (i % 6) * 14}, 80%, 60%, 0.55), hsla(${190 + (i % 6) * 10}, 85%, 55%, 0.45)), url(/hero-emblem.jpg)`,
+                      backgroundSize: "100% 100%, 600% 600%",
+                      backgroundPosition: `0 0, ${posX}% ${posY}%`,
+                      backgroundBlendMode: "overlay",
+                      animation: `pulseTile ${3 + (i % 5)}s ease-in-out ${(i % 6) * 0.15}s infinite`,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
           <ServerStatusCard />
           <style>{`
             @keyframes pulseTile {
-              0%, 100% { opacity: 0.5; transform: scale(1); }
-              50% { opacity: 1; transform: scale(1.04); }
+              0%, 100% { opacity: 0.4; transform: scale(0.97); }
+              50% { opacity: 1; transform: scale(1.03); }
             }
           `}</style>
         </div>

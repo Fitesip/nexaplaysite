@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useCart } from "@/lib/cart-context";
+import { useCart, cartKey } from "@/lib/cart-context";
+import { GAME_MODE_MAP, gradientStops, withAlpha, type GameMode } from "@/components/gameModes";
 
 type Item = {
   id: number;
   name: string;
   category: string;
+  gameMode: GameMode;
   price: number;
   stock: number | null; // null = неограниченное количество
   oneTimePurchase: boolean; // можно купить только один раз на аккаунт
@@ -14,19 +16,39 @@ type Item = {
   description: string;
 };
 
-export default function Catalog() {
+export default function Catalog({ mode }: { mode: GameMode }) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("Все");
   const { items: cartItems, addItem } = useCart();
   const [addedId, setAddedId] = useState<number | null>(null);
+  const meta = GAME_MODE_MAP[mode];
 
   useEffect(() => {
-    fetch("/api/catalog", { cache: "no-store" })
+    setLoading(true);
+    fetch(`/api/catalog?mode=${mode}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setItems(d.items ?? []))
       .finally(() => setLoading(false));
-  }, []);
+  }, [mode]);
+
+  useEffect(() => {
+    setFilter("Все");
+  }, [mode]);
+
+  // Tint the browser scrollbar with the current mode's own colors (e.g. Bloodborne's
+  // red, Heaven's white/green) instead of the site-wide default violet/cyan, so it
+  // reads as part of that mode's identity while browsing its catalog.
+  useEffect(() => {
+    const [from, to] = gradientStops(meta.gradient);
+    const root = document.documentElement.style;
+    root.setProperty("--scrollbar-from", from);
+    root.setProperty("--scrollbar-to", to);
+    return () => {
+      root.removeProperty("--scrollbar-from");
+      root.removeProperty("--scrollbar-to");
+    };
+  }, [meta.gradient]);
 
   const categories = useMemo(() => ["Все", ...Array.from(new Set(items.map((i) => i.category)))], [items]);
 
@@ -35,12 +57,13 @@ export default function Catalog() {
     [filter, items]
   );
 
-  const qtyInCart = (id: number) => cartItems.find((c) => c.id === String(id))?.qty ?? 0;
+  const qtyInCart = (id: number) => cartItems.find((c) => c.id === cartKey(mode, id))?.qty ?? 0;
 
   const handleAdd = (item: Item) => {
     if (item.oneTimePurchase && (item.purchased || qtyInCart(item.id) > 0)) return;
     addItem({
-      id: String(item.id),
+      catalogId: item.id,
+      mode: item.gameMode,
       name: item.name,
       category: item.category,
       price: item.price,
@@ -52,10 +75,23 @@ export default function Catalog() {
 
   return (
     <div>
-      <h2 className="font-[var(--font-display)] text-4xl font-bold">
-        Каталог <span className="grad-text">сервера</span>
-      </h2>
-      <p className="mt-3 max-w-2xl text-[var(--color-mist)]">
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className="pixel-corner h-9 w-9 shrink-0"
+          style={{ background: meta.gradient }}
+          aria-hidden
+        />
+        <div>
+          <h2 className="font-[var(--font-display)] text-4xl font-bold">
+            <span className="grad-text-mode" style={{ backgroundImage: meta.gradient }}>
+              {meta.label}
+            </span>{" "}
+            <span className="text-white">· {meta.tagline}</span>
+          </h2>
+        </div>
+      </div>
+      <p className="mt-3 max-w-2xl text-[var(--color-mist)]">{meta.description}</p>
+      <p className="mt-1 max-w-2xl text-xs text-[var(--color-mist)]/70">
         Привилегии влияют только на удобство и косметику — никакого преимущества в PvP или экономике.
       </p>
 
@@ -74,9 +110,14 @@ export default function Catalog() {
                 onClick={() => setFilter(c)}
                 className={`pixel-corner px-4 py-2 text-sm font-medium transition-all duration-300 ${
                   filter === c
-                    ? "bg-gradient-to-r from-violet-600 to-cyan-500 text-white shadow-[var(--shadow-glow-cyan)]"
-                    : "border border-white/10 text-[var(--color-mist)] hover:border-cyan-400/40 hover:text-white"
+                    ? "text-white shadow-[var(--shadow-glow-cyan)]"
+                    : "border border-white/10 text-[var(--color-mist)] hover:text-white"
                 }`}
+                style={
+                  filter === c
+                    ? { background: withAlpha(meta.gradient, 0.45) }
+                    : { borderColor: `${meta.accent}55` }
+                }
               >
                 {c}
               </button>
@@ -96,7 +137,10 @@ export default function Catalog() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-cyan-300/80">
+                      <span
+                        className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide opacity-80"
+                        style={{ color: meta.accent }}
+                      >
                         {item.category}
                       </span>
                       <span className="font-[var(--font-display)] font-semibold text-white">{item.price} ₽</span>
@@ -111,7 +155,7 @@ export default function Catalog() {
                       </p>
                     )}
                     {item.oneTimePurchase && (
-                      <p className="mt-2 text-xs text-cyan-300/80">
+                      <p className="mt-2 text-xs opacity-80" style={{ color: meta.accent }}>
                         {alreadyOwned ? "Уже куплено" : "Можно купить только один раз"}
                       </p>
                     )}

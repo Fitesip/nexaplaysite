@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
+import { GAME_MODES } from "@/components/gameModes";
 import type { SectionId } from "@/components/sections";
 
 type PromoState =
@@ -24,6 +25,16 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
 
   const discount = promo.status === "applied" ? promo.discountAmount : 0;
   const total = Math.max(0, subtotal - discount);
+
+  // Group cart lines by game mode so items from different modes are visually
+  // separated instead of being shown as one undifferentiated list.
+  const groupedByMode = useMemo(
+    () =>
+      GAME_MODES.map((m) => ({ meta: m, items: items.filter((i) => i.mode === m.id) })).filter(
+        (g) => g.items.length > 0
+      ),
+    [items]
+  );
 
   const validateAgainstServer = async (code: string, currentSubtotal: number) => {
     const res = await fetch("/api/promocodes/validate", {
@@ -95,7 +106,7 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: items.map((i) => ({ id: i.id, qty: i.qty })),
+          items: items.map((i) => ({ id: i.catalogId, qty: i.qty })),
           promoCode: promo.status === "applied" ? promo.code : undefined,
         }),
       });
@@ -166,53 +177,68 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
         </div>
       ) : (
         <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          {/* items list */}
-          <div className="flex flex-col gap-3">
-            {items.map((item) => (
-              <div key={item.id} className="glass-panel pixel-corner flex items-center gap-4 p-4">
-                <div className="min-w-0 flex-1">
-                  <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-cyan-300/80">
-                    {item.category}
-                  </span>
-                  <h3 className="truncate font-[var(--font-display)] text-base font-semibold text-white">
-                    {item.name}
-                  </h3>
-                  <p className="mt-1 text-sm text-[var(--color-mist)]">{item.price} ₽ / шт.</p>
+          {/* items list, grouped by game mode */}
+          <div className="flex flex-col gap-6">
+            {groupedByMode.map((group) => (
+              <div key={group.meta.id}>
+                <div className="mb-2.5 flex items-center gap-2">
+                  <span className="h-3 w-3 shrink-0 pixel-corner-sm" style={{ background: group.meta.gradient }} />
+                  <span className="font-[var(--font-display)] text-sm font-semibold text-white">{group.meta.label}</span>
+                  <span className="text-xs text-[var(--color-mist)]">· {group.meta.tagline}</span>
                 </div>
+                <div className="flex flex-col gap-3">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="glass-panel pixel-corner flex items-center gap-4 border-l-2 p-4"
+                      style={{ borderLeftColor: group.meta.accent }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-cyan-300/80">
+                          {item.category}
+                        </span>
+                        <h3 className="truncate font-[var(--font-display)] text-base font-semibold text-white">
+                          {item.name}
+                        </h3>
+                        <p className="mt-1 text-sm text-[var(--color-mist)]">{item.price} ₽ / шт.</p>
+                      </div>
 
-                <div className="flex items-center gap-2 border border-white/10">
-                  <button
-                    onClick={() => setQty(item.id, item.qty - 1)}
-                    className="flex h-8 w-8 items-center justify-center text-[var(--color-mist)] transition-colors hover:text-white"
-                    aria-label="Уменьшить количество"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center font-[var(--font-mono)] text-sm text-white">{item.qty}</span>
-                  <button
-                    onClick={() => setQty(item.id, item.qty + 1)}
-                    disabled={item.oneTimePurchase}
-                    aria-label="Увеличить количество"
-                    title={item.oneTimePurchase ? "Этот товар можно купить только в количестве 1 шт." : undefined}
-                    className="flex h-8 w-8 items-center justify-center text-[var(--color-mist)] transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-[var(--color-mist)]"
-                  >
-                    +
-                  </button>
+                      <div className="flex items-center gap-2 border border-white/10">
+                        <button
+                          onClick={() => setQty(item.id, item.qty - 1)}
+                          className="flex h-8 w-8 items-center justify-center text-[var(--color-mist)] transition-colors hover:text-white"
+                          aria-label="Уменьшить количество"
+                        >
+                          −
+                        </button>
+                        <span className="w-6 text-center font-[var(--font-mono)] text-sm text-white">{item.qty}</span>
+                        <button
+                          onClick={() => setQty(item.id, item.qty + 1)}
+                          disabled={item.oneTimePurchase}
+                          aria-label="Увеличить количество"
+                          title={item.oneTimePurchase ? "Этот товар можно купить только в количестве 1 шт." : undefined}
+                          className="flex h-8 w-8 items-center justify-center text-[var(--color-mist)] transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-[var(--color-mist)]"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <div className="w-20 shrink-0 text-right font-[var(--font-display)] font-semibold text-white">
+                        {item.price * item.qty} ₽
+                      </div>
+
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        aria-label="Удалить из корзины"
+                        className="shrink-0 text-[var(--color-mist)] transition-colors hover:text-rose-400"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                          <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="w-20 shrink-0 text-right font-[var(--font-display)] font-semibold text-white">
-                  {item.price * item.qty} ₽
-                </div>
-
-                <button
-                  onClick={() => removeItem(item.id)}
-                  aria-label="Удалить из корзины"
-                  className="shrink-0 text-[var(--color-mist)] transition-colors hover:text-rose-400"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                  </svg>
-                </button>
               </div>
             ))}
           </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
+import { GAME_MODES, type GameMode } from "@/components/gameModes";
 
 type Item = {
   id: number;
   name: string;
   category: string;
+  game_mode: GameMode;
   price: number;
   stock: number | null;
   hidden: boolean;
@@ -17,6 +19,7 @@ type Item = {
 const emptyForm = {
   name: "",
   category: "",
+  gameMode: GAME_MODES[0].id as GameMode,
   price: "",
   description: "",
   limited: false,
@@ -32,6 +35,25 @@ export default function AdminCatalog() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  // The API returns items in insertion order, mixing every mode together — group them by
+  // game mode (in the site's canonical mode order) so the table reads mode by mode instead
+  // of being scattered, with items inside each mode sorted by category then name.
+  const groupedItems = useMemo(() => {
+    const byMode = new Map<GameMode, Item[]>();
+    for (const item of items) {
+      if (!byMode.has(item.game_mode)) byMode.set(item.game_mode, []);
+      byMode.get(item.game_mode)!.push(item);
+    }
+    for (const group of byMode.values()) {
+      group.sort(
+        (a, b) => a.category.localeCompare(b.category, "ru") || a.name.localeCompare(b.name, "ru")
+      );
+    }
+    return GAME_MODES.map((m) => ({ mode: m, items: byMode.get(m.id) ?? [] })).filter(
+      (g) => g.items.length > 0
+    );
+  }, [items]);
 
   const load = async () => {
     const res = await fetch("/api/admin/catalog", { cache: "no-store" });
@@ -54,6 +76,7 @@ export default function AdminCatalog() {
     setForm({
       name: item.name,
       category: item.category,
+      gameMode: item.game_mode,
       price: String(item.price),
       description: item.description ?? "",
       limited: item.stock !== null,
@@ -79,6 +102,7 @@ export default function AdminCatalog() {
     const payload = {
       name: form.name.trim(),
       category: form.category.trim(),
+      gameMode: form.gameMode,
       price,
       description: form.description.trim(),
       stock: form.limited ? Number(form.stock) : null,
@@ -134,7 +158,7 @@ export default function AdminCatalog() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-      <form onSubmit={submit} className="glass-panel pixel-corner h-fit p-6">
+      <form onSubmit={submit} className="glass-panel pixel-corner h-fit self-start p-6 lg:sticky lg:top-28">
         <h3 className="font-[var(--font-display)] text-lg font-semibold text-white">
           {editingId ? "Редактировать товар" : "Новый товар"}
         </h3>
@@ -154,6 +178,19 @@ export default function AdminCatalog() {
               placeholder="Привилегии, Косметика, Наборы…"
               className="w-full border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/60"
             />
+          </Field>
+          <Field label="Режим">
+            <select
+              value={form.gameMode}
+              onChange={(e) => setForm((f) => ({ ...f, gameMode: e.target.value as GameMode }))}
+              className="w-full border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/60"
+            >
+              {GAME_MODES.map((m) => (
+                <option key={m.id} value={m.id} className="bg-[#0a0a12]">
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Цена, ₽">
             <input
@@ -244,53 +281,70 @@ export default function AdminCatalog() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-white/5 last:border-b-0">
-                  <td className="px-4 py-3">
-                    <div className="font-[var(--font-display)] font-semibold text-white">{item.name}</div>
-                    <div className="text-xs text-[var(--color-mist)]">{item.category}</div>
-                  </td>
-                  <td className="px-4 py-3 text-white">{item.price} ₽</td>
-                  <td className="px-4 py-3 text-[var(--color-mist)]">
-                    {item.stock === null ? "∞" : item.stock}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.hidden ? (
-                        <span className="border border-white/15 px-2 py-1 text-xs text-[var(--color-mist)]">Скрыт</span>
-                      ) : (
-                        <span className="border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300">Виден</span>
-                      )}
-                      {item.one_time_purchase && (
-                        <span className="border border-cyan-400/40 px-2 py-1 text-xs text-cyan-300">1 на аккаунт</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => startEdit(item)}
-                        className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-cyan-400/50 hover:text-white"
-                      >
-                        Изменить
-                      </button>
-                      <button
-                        onClick={() => toggleHidden(item)}
-                        disabled={busyId === item.id}
-                        className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:text-white disabled:opacity-50"
-                      >
-                        {item.hidden ? "Показать" : "Скрыть"}
-                      </button>
-                      <button
-                        onClick={() => remove(item)}
-                        disabled={busyId === item.id}
-                        className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-rose-400/50 hover:text-rose-300 disabled:opacity-50"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+              {groupedItems.map(({ mode, items: modeItems }) => (
+                <Fragment key={mode.id}>
+                  <tr className="border-b border-white/10 bg-white/[0.03]">
+                    <td colSpan={5} className="px-4 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 shrink-0 pixel-corner-sm" style={{ background: mode.gradient }} />
+                        <span
+                          className="font-[var(--font-display)] text-xs font-semibold uppercase tracking-wide"
+                          style={{ color: mode.accent }}
+                        >
+                          {mode.label}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {modeItems.map((item) => (
+                    <tr key={item.id} className="border-b border-white/5 last:border-b-0">
+                      <td className="px-4 py-3">
+                        <div className="font-[var(--font-display)] font-semibold text-white">{item.name}</div>
+                        <div className="text-xs text-[var(--color-mist)]">{item.category}</div>
+                      </td>
+                      <td className="px-4 py-3 text-white">{item.price} ₽</td>
+                      <td className="px-4 py-3 text-[var(--color-mist)]">
+                        {item.stock === null ? "∞" : item.stock}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.hidden ? (
+                            <span className="border border-white/15 px-2 py-1 text-xs text-[var(--color-mist)]">Скрыт</span>
+                          ) : (
+                            <span className="border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300">Виден</span>
+                          )}
+                          {item.one_time_purchase && (
+                            <span className="border border-cyan-400/40 px-2 py-1 text-xs text-cyan-300">1 на аккаунт</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => startEdit(item)}
+                            className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-cyan-400/50 hover:text-white"
+                          >
+                            Изменить
+                          </button>
+                          <button
+                            onClick={() => toggleHidden(item)}
+                            disabled={busyId === item.id}
+                            className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:text-white disabled:opacity-50"
+                          >
+                            {item.hidden ? "Показать" : "Скрыть"}
+                          </button>
+                          <button
+                            onClick={() => remove(item)}
+                            disabled={busyId === item.id}
+                            className="border border-white/15 px-2.5 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-rose-400/50 hover:text-rose-300 disabled:opacity-50"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

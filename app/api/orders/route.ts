@@ -22,7 +22,7 @@ export async function GET() {
 
   const ids = orders.map((o: any) => o.id);
   const [items]: any = await pool.query(
-    `SELECT order_id, name, category, price, qty FROM order_items WHERE order_id IN (${ids
+    `SELECT order_id, name, category, game_mode, price, qty FROM order_items WHERE order_id IN (${ids
       .map(() => "?")
       .join(",")})`,
     ids
@@ -31,7 +31,7 @@ export async function GET() {
   const itemsByOrder = new Map<number, any[]>();
   for (const item of items) {
     const list = itemsByOrder.get(item.order_id) ?? [];
-    list.push({ name: item.name, category: item.category, price: item.price, qty: item.qty });
+    list.push({ name: item.name, category: item.category, game_mode: item.game_mode, price: item.price, qty: item.qty });
     itemsByOrder.set(item.order_id, list);
   }
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const ids = items.map((i) => Number(i.id));
     const [catalogRows]: any = await conn.query(
-      `SELECT id, name, category, price_rub AS price, stock, hidden, one_time_purchase
+      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase
        FROM catalog_items WHERE id IN (${ids.map(() => "?").join(",")}) FOR UPDATE`,
       ids
     );
@@ -96,7 +96,14 @@ export async function POST(req: NextRequest) {
       alreadyOwnedIds = new Set(ownedRows.map((r: any) => r.id));
     }
 
-    const orderItems: { catalog_item_id: number; name: string; category: string; price: number; qty: number }[] = [];
+    const orderItems: {
+      catalog_item_id: number;
+      name: string;
+      category: string;
+      game_mode: string;
+      price: number;
+      qty: number;
+    }[] = [];
     let subtotal = 0;
 
     for (const item of items) {
@@ -126,7 +133,14 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
-      orderItems.push({ catalog_item_id: row.id, name: row.name, category: row.category, price: row.price, qty: item.qty });
+      orderItems.push({
+        catalog_item_id: row.id,
+        name: row.name,
+        category: row.category,
+        game_mode: row.game_mode,
+        price: row.price,
+        qty: item.qty,
+      });
       subtotal += row.price * item.qty;
     }
 
@@ -171,9 +185,9 @@ export async function POST(req: NextRequest) {
 
     for (const item of orderItems) {
       await conn.query(
-        `INSERT INTO order_items (order_id, catalog_item_id, name, category, price, qty)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [orderId, item.catalog_item_id, item.name, item.category, item.price, item.qty]
+        `INSERT INTO order_items (order_id, catalog_item_id, game_mode, name, category, price, qty)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, item.catalog_item_id, item.game_mode, item.name, item.category, item.price, item.qty]
       );
       // decrement stock only for items that track it
       await conn.query(

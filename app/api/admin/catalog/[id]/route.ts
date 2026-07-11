@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 const schema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   category: z.string().trim().min(1).max(50).optional(),
+  gameMode: z.enum(["terryx", "bloodborne", "heaven", "games"]).optional(),
   price: z.number().int().nonnegative().optional(),
   description: z.string().trim().max(2000).optional(),
   stock: z.number().int().nonnegative().nullable().optional(),
@@ -42,6 +43,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fields.category !== undefined) {
     sets.push("category = ?");
     values.push(fields.category);
+  }
+  if (fields.gameMode !== undefined) {
+    sets.push("game_mode = ?");
+    values.push(fields.gameMode);
   }
   if (fields.price !== undefined) {
     sets.push("price_rub = ?");

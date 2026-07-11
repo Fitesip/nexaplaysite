@@ -9,12 +9,20 @@ export async function GET() {
   }
 
   const pool = getPool();
-  const [rows] = await pool.query(
+  const [rows]: any = await pool.query(
     `SELECT id, username, email, role, banned, banned_reason, banned_until,
             forum_banned, forum_banned_reason, forum_banned_until, minecraft_username, created_at
      FROM users
      ORDER BY created_at DESC`
   );
 
-  return NextResponse.json({ users: rows }, { headers: { "Cache-Control": "no-store" } });
+  // mysql2 returns TINYINT(1) columns as 0/1, not true booleans — coerce them so
+  // client-side `{user.forum_banned && (...)}` can't render a stray "0" when false.
+  const users = rows.map((r: any) => ({
+    ...r,
+    banned: !!r.banned,
+    forum_banned: !!r.forum_banned,
+  }));
+
+  return NextResponse.json({ users }, { headers: { "Cache-Control": "no-store" } });
 }

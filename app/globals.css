@@ -20,6 +20,11 @@
 
 html {
   scroll-behavior: smooth;
+  /* Default (Terryx) scrollbar colors — overridden per game mode while browsing its catalog. */
+  --scrollbar-from: var(--color-violet);
+  --scrollbar-to: var(--color-cyan);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-from) var(--color-void);
 }
 
 body {
@@ -41,13 +46,21 @@ body {
   background: var(--color-void);
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--color-violet), var(--color-cyan));
+  background: linear-gradient(180deg, var(--scrollbar-from), var(--scrollbar-to));
   border-radius: 8px;
 }
 
 /* Gradient text used across headings, matching logo diagonal blend */
 .grad-text {
   background: linear-gradient(115deg, #c084fc 0%, #a855f7 30%, #38bdf8 70%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Same clipping technique as .grad-text, but the gradient itself is supplied inline —
+   used for the catalog headings so each game mode's own colors show through. */
+.grad-text-mode {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -88,6 +101,20 @@ body {
     calc(100% - 12px) 0, calc(100% - 12px) 12px, 100% 12px,
     100% calc(100% - 12px), calc(100% - 12px) calc(100% - 12px), calc(100% - 12px) 100%,
     12px 100%, 12px calc(100% - 12px), 0 calc(100% - 12px)
+  );
+}
+
+/* Same pixel-corner look, but with a proportionally smaller cut for tiny elements
+   (e.g. mode-color swatches around 10-24px). The 12px cut used above is larger than
+   half the box on elements that small, so the clip-path polygon self-intersects and
+   collapses to zero visible area — this variant keeps the notch small enough to stay
+   valid at small sizes. */
+.pixel-corner-sm {
+  clip-path: polygon(
+    0 3px, 3px 3px, 3px 0,
+    calc(100% - 3px) 0, calc(100% - 3px) 3px, 100% 3px,
+    100% calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 100%,
+    3px 100%, 3px calc(100% - 3px), 0 calc(100% - 3px)
   );
 }
 

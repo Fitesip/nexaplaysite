@@ -1,24 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PixelBackground from "@/components/PixelBackground";
-import AdminBackground from "@/components/AdminBackground";
+import BackgroundStage, { type BgKey } from "@/components/BackgroundStage";
 import NavBar from "@/components/NavBar";
 import type { SectionId } from "@/components/sections";
+import type { GameMode } from "@/components/gameModes";
 import Home from "@/components/sections/Home";
 import Catalog from "@/components/sections/Catalog";
 import News from "@/components/sections/News";
 import Forum from "@/components/sections/Forum";
+import GameTips from "@/components/sections/GameTips";
 import FAQ from "@/components/sections/FAQ";
 import Contact from "@/components/sections/Contact";
 import Cabinet from "@/components/sections/Cabinet";
 import Cart from "@/components/sections/Cart";
 import Admin from "@/components/sections/Admin";
 
-const VALID_SECTIONS: SectionId[] = ["home", "catalog", "news", "forum", "faq", "contact", "cabinet", "cart", "admin"];
+const VALID_SECTIONS: SectionId[] = [
+  "home",
+  "catalog",
+  "news",
+  "forum",
+  "tips",
+  "faq",
+  "contact",
+  "cabinet",
+  "cart",
+  "admin",
+];
 
 export default function Page() {
   const [active, setActive] = useState<SectionId>("home");
+  const [mode, setMode] = useState<GameMode>("terryx");
   const [renderKey, setRenderKey] = useState(0);
 
   // restore the section from the URL hash on load, so a refresh stays put
@@ -47,16 +60,19 @@ export default function Page() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const bgKey: BgKey = active === "admin" ? "admin" : active === "catalog" ? `catalog:${mode}` : "default";
+
   return (
     <main className="relative flex min-h-screen flex-col">
-      {active === "admin" ? <AdminBackground /> : <PixelBackground />}
-      <NavBar active={active} onChange={goTo} />
+      <BackgroundStage bgKey={bgKey} />
+      <NavBar active={active} onChange={goTo} mode={mode} onSelectMode={setMode} />
 
       <div key={renderKey} className="section-enter mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-32 sm:px-6">
         {active === "home" && <Home onNavigate={goTo} />}
-        {active === "catalog" && <Catalog />}
+        {active === "catalog" && <Catalog mode={mode} />}
         {active === "news" && <News />}
         {active === "forum" && <Forum onNavigate={goTo} />}
+        {active === "tips" && <GameTips />}
         {active === "faq" && <FAQ />}
         {active === "contact" && <Contact />}
         {active === "cabinet" && <Cabinet />}

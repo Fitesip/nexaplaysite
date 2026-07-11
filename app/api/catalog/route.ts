@@ -1,14 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
 
-export async function GET() {
+const VALID_MODES = new Set(["terryx", "bloodborne", "heaven", "games"]);
+
+export async function GET(req: NextRequest) {
+  const modeParam = req.nextUrl.searchParams.get("mode");
+  const mode = modeParam && VALID_MODES.has(modeParam) ? modeParam : null;
+
   const pool = getPool();
   const [rows]: any = await pool.query(
-    `SELECT id, name, category, price_rub AS price, stock, one_time_purchase AS oneTimePurchase, description
+    `SELECT id, name, category, game_mode AS gameMode, price_rub AS price, stock,
+            one_time_purchase AS oneTimePurchase, description
      FROM catalog_items
-     WHERE hidden = 0
-     ORDER BY category ASC, id ASC`
+     WHERE hidden = 0 ${mode ? "AND game_mode = ?" : ""}
+     ORDER BY category ASC, id ASC`,
+    mode ? [mode] : []
   );
 
   // For one-time items, tell the logged-in user which ones they've already bought

@@ -1,9 +1,15 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
+import type { GameMode } from "@/components/gameModes";
 
 export type CartItem = {
+  /** composite key: `${mode}:${catalogId}` — keeps identically-priced items from
+   * different game modes from ever being treated as the same cart line */
   id: string;
+  /** the underlying catalog_items.id, used when submitting the order */
+  catalogId: number;
+  mode: GameMode;
   name: string;
   category: string;
   price: number; // in rubles
@@ -11,9 +17,14 @@ export type CartItem = {
   oneTimePurchase?: boolean; // can only ever be bought once per account, qty is locked to 1
 };
 
+/** Builds the composite cart key for a given mode + catalog item id. */
+export function cartKey(mode: GameMode, catalogId: number | string): string {
+  return `${mode}:${catalogId}`;
+}
+
 type CartContextValue = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "qty">, qty?: number) => void;
+  addItem: (item: Omit<CartItem, "id" | "qty">, qty?: number) => void;
   removeItem: (id: string) => void;
   setQty: (id: string, qty: number) => void;
   clear: () => void;
@@ -51,14 +62,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items, hydrated]);
 
   const addItem: CartContextValue["addItem"] = (item, qty = 1) => {
+    const key = cartKey(item.mode, item.catalogId);
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const existing = prev.find((i) => i.id === key);
       if (existing) {
         // one-time items are capped at qty 1 — already in the cart, nothing to add
         if (existing.oneTimePurchase) return prev;
-        return prev.map((i) => (i.id === item.id ? { ...i, qty: i.qty + qty } : i));
+        return prev.map((i) => (i.id === key ? { ...i, qty: i.qty + qty } : i));
       }
-      return [...prev, { ...item, qty: item.oneTimePurchase ? 1 : qty }];
+      return [...prev, { ...item, id: key, qty: item.oneTimePurchase ? 1 : qty }];
     });
   };
 

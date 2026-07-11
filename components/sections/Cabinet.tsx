@@ -5,6 +5,7 @@ import Captcha from "@/components/Captcha";
 import SupportChat from "@/components/SupportChat";
 import { useAuth, type CurrentUser } from "@/lib/auth-context";
 import { avatarSrc } from "@/lib/avatar";
+import { GAME_MODE_MAP, type GameMode } from "@/components/gameModes";
 
 type Mode = "login" | "register";
 type User = CurrentUser;
@@ -556,7 +557,7 @@ function ReferralCard() {
   );
 }
 
-type OrderItem = { name: string; category: string; price: number; qty: number };
+type OrderItem = { name: string; category: string; game_mode: GameMode; price: number; qty: number };
 type Order = {
   id: number;
   subtotal: number;
@@ -632,7 +633,11 @@ function OrderHistory() {
                     <div className="flex flex-col gap-2 border-t border-white/10 px-4 py-3">
                       {order.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between text-sm text-[var(--color-mist)]">
-                          <span>
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className="h-2 w-2 shrink-0 pixel-corner-sm"
+                              style={{ background: GAME_MODE_MAP[item.game_mode]?.gradient }}
+                            />
                             {item.name} × {item.qty}
                           </span>
                           <span className="text-white">{item.price * item.qty} ₽</span>
