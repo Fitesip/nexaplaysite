@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-chakra), "Space Grotesk", sans-serif;
+  --font-body: var(--font-inter), sans-serif;
+  --font-mono: var(--font-jbmono), monospace;
+
+  --color-void: #050308;
+  --color-void-2: #0a0714;
+  --color-panel: #0d0a1a;
+  --color-violet: #a855f7;
+  --color-violet-deep: #6d28d9;
+  --color-cyan: #22d3ee;
+  --color-cyan-deep: #0891b2;
+  --color-mist: #b9b3d4;
+
+  --shadow-glow-violet: 0 0 40px rgba(168, 85, 247, 0.35);
+  --shadow-glow-cyan: 0 0 40px rgba(34, 211, 238, 0.35);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-void);
+  color: #eae7f5;
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.4);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-void);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-violet), var(--color-cyan));
+  border-radius: 8px;
+}
+
+/* Gradient text used across headings, matching logo diagonal blend */
+.grad-text {
+  background: linear-gradient(115deg, #c084fc 0%, #a855f7 30%, #38bdf8 70%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Section switching: fade + rise, used by page router */
+.section-enter {
+  animation: sectionIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes sectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Nav pill glider */
+.nav-pill {
+  transition: left 0.5s cubic-bezier(0.22, 1, 0.36, 1), width 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease;
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(20, 14, 38, 0.7), rgba(10, 7, 20, 0.75));
+  border: 1px solid rgba(168, 85, 247, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.pixel-corner {
+  clip-path: polygon(
+    0 12px, 12px 12px, 12px 0,
+    calc(100% - 12px) 0, calc(100% - 12px) 12px, 100% 12px,
+    100% calc(100% - 12px), calc(100% - 12px) calc(100% - 12px), calc(100% - 12px) 100%,
+    12px 100%, 12px calc(100% - 12px), 0 calc(100% - 12px)
+  );
+}
+
+/* Admin/helper panel background: soft drifting glow orbs, swapped in for the floating
+   pixel-cubes to make "staff mode" visually distinct at a glance. */
+@keyframes adminDrift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4vmax, 3vmax) scale(1.08); }
+}
+@keyframes adminDrift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-3vmax, -4vmax) scale(1.06); }
+}
+@keyframes adminDrift3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(2vmax, -2vmax) scale(1.1); }
+}
+@keyframes adminHue1 {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+@keyframes adminHue2 {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(-360deg); }
+}
+@keyframes adminHue3 {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Minecraft "§k" obfuscated text: hint that the underlying text is scrambled in-game
+   without needing per-frame character randomization. */
+.mc-obfuscated {
+  filter: blur(1.5px);
+  letter-spacing: 0.02em;
+  animation: mcObfuscatedFlicker 0.6s steps(2, jump-none) infinite;
+}
+@keyframes mcObfuscatedFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
