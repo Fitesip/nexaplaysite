@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * React context for the notification bell: loads existing notifications from
+ * the API, then listens on the shared socket connection for new ones so the
+ * bell updates in real time without polling.
+ */
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { useSocket } from "./socket-context";

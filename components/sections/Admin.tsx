@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * The staff panel section: a tab switcher between users, catalog, news,
+ * forum reports, support inbox, and (main admins only) the RCON console.
+ * Each tab's actual UI lives in components/admin/*.
+ */
 import { useState } from "react";
 import AdminSupport from "@/components/admin/AdminSupport";
 import AdminUsers from "@/components/admin/AdminUsers";

@@ -1,3 +1,4 @@
+/** GET /api/support/admin/chats — lists every open support conversation, with unread counts, for staff. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";

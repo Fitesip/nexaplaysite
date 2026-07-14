@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * The donate shop for the currently-selected game mode: fetches items from
+ * /api/catalog, lets the visitor filter by category, and adds items to the
+ * cart. The page's whole visual theme (banner, accent colors) follows
+ * whichever game mode is selected in the nav dropdown.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { useCart, cartKey } from "@/lib/cart-context";
 import { GAME_MODE_MAP, gradientStops, withAlpha, type GameMode } from "@/components/gameModes";

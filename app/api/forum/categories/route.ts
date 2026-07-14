@@ -1,3 +1,4 @@
+/** GET /api/forum/categories — lists forum categories with their topic counts. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 

@@ -1,3 +1,4 @@
+/** POST /api/promocodes/redeem — atomically increments a promo code's use count at checkout. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

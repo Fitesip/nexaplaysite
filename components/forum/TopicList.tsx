@@ -1,7 +1,11 @@
 "use client";
 
+/** Forum landing view: category/tag filters, sort order, and the list of topics. */
 import { useEffect, useState } from "react";
 import UserMeta, { formatDateTime } from "./UserMeta";
+import CategoryPill from "./CategoryPill";
+import SortButton from "./SortButton";
+import { pluralAnswers } from "@/lib/pluralize";
 
 type Category = { id: number; slug: string; name: string; description: string | null; topic_count: number };
 type Tag = { id: number; name: string; topic_count: number };
@@ -236,7 +240,7 @@ export default function TopicList({
             <div className="flex shrink-0 items-center gap-2 self-start sm:flex-col sm:items-end sm:self-center">
               <span className="font-[var(--font-display)] text-xl font-bold text-white">{topic.comment_count}</span>
               <span className="font-[var(--font-mono)] text-[11px] text-[var(--color-mist)]/70">
-                {pluralComments(topic.comment_count)}
+                {pluralAnswers(topic.comment_count)}
               </span>
             </div>
           </button>
@@ -266,40 +270,4 @@ export default function TopicList({
       )}
     </div>
   );
-}
-
-function CategoryPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`pixel-corner px-4 py-2 font-[var(--font-display)] text-sm tracking-wide transition-all duration-300 ${
-        active
-          ? "bg-gradient-to-r from-violet-600 to-cyan-500 text-white shadow-[var(--shadow-glow-cyan)]"
-          : "glass-panel text-[var(--color-mist)] hover:text-white"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function SortButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 uppercase tracking-wide transition-colors duration-300 ${
-        active ? "text-cyan-300" : "text-[var(--color-mist)]/70 hover:text-white"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function pluralComments(n: number) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "ответ";
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "ответа";
-  return "ответов";
 }

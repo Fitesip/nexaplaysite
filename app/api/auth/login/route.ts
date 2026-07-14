@@ -1,3 +1,4 @@
+/** POST /api/auth/login — verifies credentials and issues the session cookie. */
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";

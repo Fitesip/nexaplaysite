@@ -1,5 +1,6 @@
 "use client";
 
+/** "Пожаловаться" button + reason form for flagging a forum topic or comment to staff. */
 import { useState, FormEvent } from "react";
 
 export default function ReportButton({

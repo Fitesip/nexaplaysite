@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Main-admin-only RCON console: a terminal-style input/output log for running
+ * server commands remotely, plus a live TPS readout. Renders Minecraft's
+ * `&`-color-code formatting so command output looks the same as in-game.
+ */
 import { useEffect, useRef, useState, FormEvent } from "react";
 import { MinecraftText, ampersandToSectionSign, COLOR_CODE_ENTRIES, FORMAT_CODE_ENTRIES } from "@/lib/minecraft-colors";
 

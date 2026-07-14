@@ -1,3 +1,4 @@
+/** POST /api/orders — creates an order from the cart (checkout); GET lists the user's past orders. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

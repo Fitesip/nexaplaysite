@@ -1,5 +1,6 @@
 "use client";
 
+/** Bundles every client-side React context provider the app needs, in one place. */
 import { ReactNode } from "react";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";

@@ -1,5 +1,6 @@
 "use client";
 
+/** Form for starting a new forum topic: title, category, tags, and body, with a live preview. */
 import { useEffect, useState, FormEvent, KeyboardEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
 

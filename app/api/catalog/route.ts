@@ -1,3 +1,4 @@
+/** GET /api/catalog — lists non-hidden shop items, flagging ones the current user already owns (for one-time-purchase items). */
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";

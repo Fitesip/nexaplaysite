@@ -1,5 +1,6 @@
 "use client";
 
+/** Emoji reaction row (👍 ❤️ 😂 😮 😢) for a forum topic or comment, with per-emoji counts. */
 import { useState } from "react";
 
 export const ALLOWED_EMOJI = ["👍", "❤️", "😂", "😮", "😢"] as const;

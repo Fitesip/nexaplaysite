@@ -1,3 +1,4 @@
+/** GET /api/admin/rcon/tps — fetches the server's current ticks-per-second reading. */
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/auth";
 import { fetchTps } from "@/lib/tps";

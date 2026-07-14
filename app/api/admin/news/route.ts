@@ -1,3 +1,4 @@
+/** GET/POST /api/admin/news — list every news post, or create a new one. Admins only. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

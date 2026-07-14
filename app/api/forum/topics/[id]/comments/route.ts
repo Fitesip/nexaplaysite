@@ -1,3 +1,4 @@
+/** POST /api/forum/topics/:id/comments — posts a new comment or reply on a topic. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

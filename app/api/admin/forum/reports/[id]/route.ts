@@ -1,3 +1,4 @@
+/** PATCH /api/admin/forum/reports/:id — resolves a report (optionally deleting the reported content). */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

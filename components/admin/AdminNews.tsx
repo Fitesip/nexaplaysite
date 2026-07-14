@@ -1,6 +1,8 @@
 "use client";
 
+/** Admin tab for managing news posts: create/edit/pin/delete. */
 import { useEffect, useState, FormEvent } from "react";
+import Field from "./Field";
 
 type NewsItem = {
   id: number;
@@ -241,14 +243,5 @@ export default function AdminNews() {
         )}
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs text-[var(--color-mist)]">{label}</span>
-      {children}
-    </label>
   );
 }

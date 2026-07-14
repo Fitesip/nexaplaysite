@@ -1,5 +1,6 @@
 "use client";
 
+/** Static FAQ accordion — questions/answers are hardcoded below, no API call. */
 import { useState } from "react";
 
 const FAQS = [

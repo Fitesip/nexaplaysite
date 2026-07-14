@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Floating support chat widget for logged-in users: a small bubble that opens
+ * into a message thread with staff, backed by /api/support/messages and kept
+ * live via the shared socket connection (with a polling fallback).
+ */
 import { useEffect, useRef, useState, FormEvent } from "react";
 import { useSocket } from "@/lib/socket-context";
 

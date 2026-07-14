@@ -1,3 +1,4 @@
+/** GET/POST /api/support/messages — the logged-in user's own support chat: history, or send a message. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

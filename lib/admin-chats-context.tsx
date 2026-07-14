@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * React context for the staff support inbox: the list of open chats with
+ * unread counts, kept live via the shared socket connection and exposed to
+ * both the admin nav badge and the AdminSupport panel.
+ */
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { useSocket } from "./socket-context";

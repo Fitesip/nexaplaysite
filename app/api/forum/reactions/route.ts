@@ -1,3 +1,4 @@
+/** POST /api/forum/reactions — toggles an emoji reaction on a topic or comment. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

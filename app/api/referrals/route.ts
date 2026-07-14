@@ -1,3 +1,4 @@
+/** GET /api/referrals — returns the user's referral code and the list of friends who signed up with it. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";

@@ -1,3 +1,4 @@
+/** PATCH /api/admin/users/:id — bans/unbans or changes the role of a single user. Admins only. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

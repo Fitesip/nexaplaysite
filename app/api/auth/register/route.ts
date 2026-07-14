@@ -1,3 +1,4 @@
+/** POST /api/auth/register — validates the captcha, creates the account, and starts a session. */
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";

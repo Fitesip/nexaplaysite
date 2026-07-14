@@ -1,5 +1,6 @@
 "use client";
 
+/** Landing page: hero with IP-copy button and live server status, feature strip, and reviews. */
 import { useState } from "react";
 import type { SectionId } from "@/components/sections";
 import Recommendations from "@/components/sections/Recommendations";

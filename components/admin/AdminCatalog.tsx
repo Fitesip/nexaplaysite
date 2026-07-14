@@ -1,7 +1,9 @@
 "use client";
 
+/** Admin tab for managing shop items: create/edit/hide/delete, per game mode, one-time-purchase toggle. */
 import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
 import { GAME_MODES, type GameMode } from "@/components/gameModes";
+import Field from "./Field";
 
 type Item = {
   id: number;
@@ -351,14 +353,5 @@ export default function AdminCatalog() {
         )}
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs text-[var(--color-mist)]">{label}</span>
-      {children}
-    </label>
   );
 }

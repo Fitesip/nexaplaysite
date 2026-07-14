@@ -1,3 +1,4 @@
+/** POST /api/contact — validates and stores a contact-form submission. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

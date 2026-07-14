@@ -1,3 +1,4 @@
+/** POST /api/admin/rcon — runs a raw command on the game server via RCON. Staff only. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/auth";

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * React context that tracks the currently logged-in user across the whole app.
+ * On mount it calls GET /api/auth/me once to restore the session from the
+ * httpOnly cookie, then exposes `user` + `setUser` so any component can read
+ * or update it (e.g. after login, logout, or editing the profile).
+ */
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 
 export type Role = "user" | "helper" | "admin" | "main_admin";

@@ -1,5 +1,6 @@
 "use client";
 
+/** Admin tab for forum moderation: reviewing and resolving reported topics/comments. */
 import { useEffect, useState } from "react";
 
 type Report = {

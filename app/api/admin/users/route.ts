@@ -1,3 +1,4 @@
+/** GET /api/admin/users — lists all accounts for the moderation table. Admins only. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";

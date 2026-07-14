@@ -1,3 +1,4 @@
+/** GET /api/server-status — pings the Minecraft server directly and caches the result for 15s. */
 import { NextResponse } from "next/server";
 import { pingServer, type ServerStatus } from "@/lib/mcstatus";
 

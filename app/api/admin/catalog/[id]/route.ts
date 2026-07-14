@@ -1,3 +1,4 @@
+/** PATCH/DELETE /api/admin/catalog/:id — edit or remove a single shop item. Admins only. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

@@ -1,3 +1,4 @@
+/** POST/DELETE /api/auth/avatar — uploads (or removes) the user's profile picture to public/uploads/avatars. */
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { mkdir, unlink, writeFile } from "fs/promises";

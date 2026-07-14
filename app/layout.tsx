@@ -1,3 +1,4 @@
+/** Root layout: loads the site fonts and wraps every page in the shared client-side providers. */
 import type { Metadata } from "next";
 import { Exo_2, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";

@@ -1,3 +1,4 @@
+/** GET/PATCH /api/notifications — list the user's notifications, or mark them read. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

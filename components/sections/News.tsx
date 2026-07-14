@@ -1,5 +1,6 @@
 "use client";
 
+/** "Новости" section: list of posts fetched from /api/news, pinned ones sorted first. */
 import { useEffect, useState } from "react";
 
 type NewsItem = {

@@ -1,3 +1,4 @@
+/** PATCH /api/auth/profile — changes the logged-in user's username, after checking it's free. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

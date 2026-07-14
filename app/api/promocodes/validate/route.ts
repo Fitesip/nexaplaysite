@@ -1,3 +1,4 @@
+/** POST /api/promocodes/validate — checks a promo code (active, not expired, under its use cap) and returns the discount. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

@@ -1,3 +1,4 @@
+/** GET /api/auth/me — returns the currently logged-in user (from the session cookie), or null. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId, isBanActive } from "@/lib/auth";

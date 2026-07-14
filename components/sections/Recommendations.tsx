@@ -1,5 +1,6 @@
 "use client";
 
+/** Auto-scrolling row of (hardcoded) player reviews, shown on the home page. */
 import { useEffect, useRef, useState } from "react";
 
 type Review = {

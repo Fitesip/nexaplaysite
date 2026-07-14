@@ -1,3 +1,4 @@
+/** GET /api/admin/rcon/history — returns the recent log of RCON commands run through the console. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";

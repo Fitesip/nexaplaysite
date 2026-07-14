@@ -1,3 +1,7 @@
+/**
+ * Shared MySQL connection pool. Cached on `global` so hot-reloading in dev
+ * doesn't spawn a fresh pool (and fresh connections) on every file save.
+ */
 import mysql from "mysql2/promise";
 
 declare global {

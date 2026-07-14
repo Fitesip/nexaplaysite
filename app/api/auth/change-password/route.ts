@@ -1,3 +1,4 @@
+/** POST /api/auth/change-password — verifies the current password, then sets a new one. */
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { z } from "zod";

@@ -1,5 +1,6 @@
 "use client";
 
+/** Simple math captcha ("3 + 5 = ?") shown on the registration form to deter bot signups. */
 import { useEffect, useState } from "react";
 
 export default function Captcha({

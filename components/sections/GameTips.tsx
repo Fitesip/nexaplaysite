@@ -1,5 +1,6 @@
 "use client";
 
+/** "Рекомендации" section — placeholder page, not yet built out. */
 export default function GameTips() {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center text-center">

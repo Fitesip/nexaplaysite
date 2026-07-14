@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * A single shared WebSocket connection (see server.js for the server side),
+ * re-used by every feature that needs real-time push updates (support chat,
+ * notifications, admin chat list) instead of each opening its own socket.
+ * Consumers call `subscribe(event, handler)` and get an unsubscribe function back.
+ */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { useAuth } from "./auth-context";
 

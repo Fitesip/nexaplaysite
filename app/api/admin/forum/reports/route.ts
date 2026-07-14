@@ -1,3 +1,4 @@
+/** GET /api/admin/forum/reports — lists pending forum reports for staff to review. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";

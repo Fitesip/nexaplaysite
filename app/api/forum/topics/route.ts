@@ -1,3 +1,4 @@
+/** GET/POST /api/forum/topics — lists topics (filterable/sortable), or creates a new one. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

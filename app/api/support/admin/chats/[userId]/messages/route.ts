@@ -1,3 +1,4 @@
+/** GET/POST /api/support/admin/chats/:userId/messages — staff view of one user's support conversation. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

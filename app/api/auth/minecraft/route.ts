@@ -1,3 +1,9 @@
+/**
+ * /api/auth/minecraft — links a Minecraft account to the site profile.
+ * GET returns the current link state; POST validates the nickname against
+ * Mojang and whispers a one-time code to the player in-game via RCON; PUT
+ * verifies the code the player typed back in; DELETE unlinks/cancels.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

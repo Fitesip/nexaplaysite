@@ -1,5 +1,6 @@
 "use client";
 
+/** "Связь" section: a contact form that posts to /api/contact and stores the message in MySQL. */
 import { useState, FormEvent } from "react";
 
 type Status = "idle" | "loading" | "success" | "error";

@@ -1,6 +1,9 @@
 "use client";
 
+/** Admin tab for user moderation: search, ban/unban (site + forum-only), and role changes. */
 import { useEffect, useState } from "react";
+import { formatUntil } from "./formatUntil";
+import ActionButton from "./ActionButton";
 
 type Role = "user" | "helper" | "admin" | "main_admin";
 type AdminUser = {
@@ -42,10 +45,6 @@ const DURATIONS: { label: string; hours: number | null }[] = [
   { label: "7 дней", hours: 24 * 7 },
   { label: "30 дней", hours: 24 * 30 },
 ];
-
-function formatUntil(until: string | null) {
-  return until ? `до ${new Date(until).toLocaleString("ru-RU")}` : "навсегда";
-}
 
 export default function AdminUsers({ myRole, myId }: { myRole: Role; myId: number }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -288,33 +287,5 @@ export default function AdminUsers({ myRole, myId }: { myRole: Role; myId: numbe
         </div>
       )}
     </div>
-  );
-}
-
-function ActionButton({
-  onClick,
-  busy,
-  tone,
-  children,
-}: {
-  onClick: () => void;
-  busy: boolean;
-  tone: "danger" | "warning" | "neutral";
-  children: React.ReactNode;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "hover:border-rose-400/50 hover:text-rose-300"
-      : tone === "warning"
-        ? "hover:border-amber-400/50 hover:text-amber-300"
-        : "hover:border-cyan-400/50 hover:text-white";
-  return (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      className={`border border-white/15 px-3 py-1.5 text-xs text-[var(--color-mist)] transition-colors duration-300 disabled:opacity-50 ${toneClass}`}
-    >
-      {children}
-    </button>
   );
 }

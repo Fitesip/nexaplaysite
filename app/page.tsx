@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * The entire site is one page: this component owns which section is active
+ * and which game mode is selected, restores that from the URL hash on load,
+ * and swaps in the matching background + section component.
+ */
 import { useEffect, useState } from "react";
 import BackgroundStage, { type BgKey } from "@/components/BackgroundStage";
 import NavBar from "@/components/NavBar";

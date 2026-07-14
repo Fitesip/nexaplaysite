@@ -1,3 +1,4 @@
+/** GET /api/forum/topics/:id — full topic + comment tree. PATCH pins/unpins it (staff only). */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

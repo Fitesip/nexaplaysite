@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * The shopping cart page: line items (grouped/priced via lib/cart-context),
+ * a promo-code field that validates against the server, and a mock checkout
+ * that clears the cart and redeems the promo code (no real payment gateway).
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";

@@ -1,3 +1,4 @@
+/** POST /api/forum/reports — flags a topic or comment for staff review. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";

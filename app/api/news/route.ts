@@ -1,3 +1,4 @@
+/** GET /api/news — lists news posts, pinned first. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 
