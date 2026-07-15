@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     const ids = items.map((i) => Number(i.id));
     const [catalogRows]: any = await conn.query(
-      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase
+      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase, is_case
        FROM catalog_items WHERE id IN (${ids.map(() => "?").join(",")}) FOR UPDATE`,
       ids
     );
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       game_mode: string;
       price: number;
       qty: number;
+      is_case: boolean;
     }[] = [];
     let subtotal = 0;
 
@@ -141,6 +142,7 @@ export async function POST(req: NextRequest) {
         game_mode: row.game_mode,
         price: row.price,
         qty: item.qty,
+        is_case: Boolean(row.is_case),
       });
       subtotal += row.price * item.qty;
     }
@@ -195,6 +197,17 @@ export async function POST(req: NextRequest) {
         `UPDATE catalog_items SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL`,
         [item.qty, item.catalog_item_id]
       );
+      // Кейсы падают в инвентарь пользователя: одна строка на каждый купленный экземпляр,
+      // чтобы каждый кейс открывался отдельно (со своей анимацией и выпавшим предметом).
+      if (item.is_case) {
+        for (let n = 0; n < item.qty; n++) {
+          await conn.query(
+            `INSERT INTO user_cases (user_id, case_id, case_name, game_mode)
+             VALUES (?, ?, ?, ?)`,
+            [userId, item.catalog_item_id, item.name, item.game_mode]
+          );
+        }
+      }
     }
 
     await conn.commit();

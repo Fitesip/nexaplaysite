@@ -6,6 +6,7 @@ import { avatarSrc } from "@/lib/avatar";
 import StatCard from "./StatCard";
 import MinecraftLinkCard from "./MinecraftLinkCard";
 import ReferralCard from "./ReferralCard";
+import Inventory from "./Inventory";
 import OrderHistory from "./OrderHistory";
 import ChangePasswordForm from "./ChangePasswordForm";
 import { ROLE_LABEL, type User } from "./types";
@@ -226,6 +227,7 @@ export default function Profile({
 
       <MinecraftLinkCard user={user} onUserUpdate={onUserUpdate} />
       <ReferralCard />
+      <Inventory />
       <OrderHistory />
       <SupportChat />
       <ChangePasswordForm />

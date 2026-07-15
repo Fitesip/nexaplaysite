@@ -13,6 +13,7 @@ const schema = z.object({
   stock: z.number().int().nonnegative().nullable().optional(),
   hidden: z.boolean().optional(),
   oneTimePurchase: z.boolean().optional(),
+  isCase: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -68,6 +69,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (fields.oneTimePurchase !== undefined) {
     sets.push("one_time_purchase = ?");
     values.push(fields.oneTimePurchase ? 1 : 0);
+  }
+  if (fields.isCase !== undefined) {
+    sets.push("is_case = ?");
+    values.push(fields.isCase ? 1 : 0);
   }
 
   if (sets.length === 0) {

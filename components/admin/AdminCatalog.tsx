@@ -4,6 +4,7 @@
 import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
 import { GAME_MODES, type GameMode } from "@/components/gameModes";
 import Field from "./Field";
+import CaseLootEditor from "./CaseLootEditor";
 
 type Item = {
   id: number;
@@ -14,6 +15,7 @@ type Item = {
   stock: number | null;
   hidden: boolean;
   one_time_purchase: boolean;
+  is_case: boolean;
   description: string;
   created_at: string;
 };
@@ -27,6 +29,7 @@ const emptyForm = {
   limited: false,
   stock: "",
   oneTimePurchase: false,
+  isCase: false,
 };
 
 export default function AdminCatalog() {
@@ -37,6 +40,7 @@ export default function AdminCatalog() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [lootEditor, setLootEditor] = useState<{ id: number; name: string } | null>(null);
 
   // The API returns items in insertion order, mixing every mode together — group them by
   // game mode (in the site's canonical mode order) so the table reads mode by mode instead
@@ -84,6 +88,7 @@ export default function AdminCatalog() {
       limited: item.stock !== null,
       stock: item.stock !== null ? String(item.stock) : "",
       oneTimePurchase: item.one_time_purchase,
+      isCase: item.is_case,
     });
   };
 
@@ -109,6 +114,7 @@ export default function AdminCatalog() {
       description: form.description.trim(),
       stock: form.limited ? Number(form.stock) : null,
       oneTimePurchase: form.oneTimePurchase,
+      isCase: form.isCase,
     };
 
     try {
@@ -244,6 +250,26 @@ export default function AdminCatalog() {
             Одноразовый товар (один аккаунт — одна покупка)
           </label>
 
+          <label className="flex items-center gap-2 text-sm text-[var(--color-mist)]">
+            <input
+              type="checkbox"
+              checked={form.isCase}
+              onChange={(e) => setForm((f) => ({ ...f, isCase: e.target.checked }))}
+              className="h-4 w-4"
+            />
+            Кейс (падает в инвентарь, открывается с анимацией)
+          </label>
+          {form.isCase && editingId && (
+            <p className="text-xs text-[var(--color-mist)]/80">
+              Настройте предметы и шансы кнопкой «Содержимое» в таблице справа.
+            </p>
+          )}
+          {form.isCase && !editingId && (
+            <p className="text-xs text-[var(--color-mist)]/80">
+              Сохраните кейс, затем задайте его содержимое кнопкой «Содержимое» в таблице.
+            </p>
+          )}
+
           {error && <p className="text-sm text-rose-400">{error}</p>}
 
           <div className="mt-1 flex gap-2">
@@ -318,6 +344,9 @@ export default function AdminCatalog() {
                           {item.one_time_purchase && (
                             <span className="border border-cyan-400/40 px-2 py-1 text-xs text-cyan-300">1 на аккаунт</span>
                           )}
+                          {item.is_case && (
+                            <span className="border border-violet-400/40 px-2 py-1 text-xs text-violet-300">Кейс</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -328,6 +357,14 @@ export default function AdminCatalog() {
                           >
                             Изменить
                           </button>
+                          {item.is_case && (
+                            <button
+                              onClick={() => setLootEditor({ id: item.id, name: item.name })}
+                              className="border border-violet-400/40 px-2.5 py-1.5 text-xs text-violet-300 transition-colors duration-300 hover:border-violet-400/70 hover:text-white"
+                            >
+                              Содержимое
+                            </button>
+                          )}
                           <button
                             onClick={() => toggleHidden(item)}
                             disabled={busyId === item.id}
@@ -352,6 +389,14 @@ export default function AdminCatalog() {
           </table>
         )}
       </div>
+
+      {lootEditor && (
+        <CaseLootEditor
+          caseId={lootEditor.id}
+          caseName={lootEditor.name}
+          onClose={() => setLootEditor(null)}
+        />
+      )}
     </div>
   );
 }
