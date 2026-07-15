@@ -16,7 +16,6 @@ import News from "@/components/sections/News";
 import Forum from "@/components/sections/Forum";
 import GameTips from "@/components/sections/GameTips";
 import FAQ from "@/components/sections/FAQ";
-import Contact from "@/components/sections/Contact";
 import Cabinet from "@/components/sections/Cabinet";
 import Cart from "@/components/sections/Cart";
 import Admin from "@/components/sections/Admin";
@@ -28,7 +27,6 @@ const VALID_SECTIONS: SectionId[] = [
   "forum",
   "tips",
   "faq",
-  "contact",
   "cabinet",
   "cart",
   "admin",
@@ -79,7 +77,6 @@ export default function Page() {
         {active === "forum" && <Forum onNavigate={goTo} />}
         {active === "tips" && <GameTips />}
         {active === "faq" && <FAQ />}
-        {active === "contact" && <Contact />}
         {active === "cabinet" && <Cabinet />}
         {active === "cart" && <Cart onNavigate={goTo} />}
         {active === "admin" && <Admin />}

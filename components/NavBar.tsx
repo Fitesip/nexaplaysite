@@ -20,7 +20,6 @@ const NAV_AFTER_CATALOG: { id: SectionId; label: string }[] = [
   { id: "forum", label: "Форум" },
   { id: "tips", label: "Рекомендации" },
   { id: "faq", label: "FAQ" },
-  { id: "contact", label: "Связь" },
 ];
 
 /** All section ids that live inside the sliding-pill nav bar (as opposed to the icon buttons on the right). */
