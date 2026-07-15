@@ -124,7 +124,7 @@ export default function CaseReel({
         style={{
           gap: `${TILE_GAP}px`,
           transform: `translateX(-${offset}px)`,
-          transition: spinning && !done ? "transform 4.6s cubic-bezier(0.12, 0.6, 0.04, 1)" : "none",
+          transition: spinning && !done ? "transform 8s cubic-bezier(0.12, 0.6, 0.04, 1)" : "none",
         }}
         onTransitionEnd={settle}
       >

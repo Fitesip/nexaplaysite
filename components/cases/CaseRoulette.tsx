@@ -184,7 +184,7 @@ export default function CaseRoulette({
                 style={{
                   gap: `${TILE_GAP}px`,
                   transform: `translateX(-${offset}px)`,
-                  transition: phase === "spinning" ? "transform 5.6s cubic-bezier(0.12, 0.6, 0.04, 1)" : "none",
+                  transition: phase === "spinning" ? "transform 9.5s cubic-bezier(0.12, 0.6, 0.04, 1)" : "none",
                 }}
                 onTransitionEnd={settle}
               >

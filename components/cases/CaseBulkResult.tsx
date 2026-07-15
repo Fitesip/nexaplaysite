@@ -108,7 +108,7 @@ export default function CaseBulkResult({
               Открыто кейсов: <span className="text-white">{results.length}</span>
             </p>
 
-            <div className="mt-5 flex flex-col gap-2">
+            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {results.map((r, idx) => (
                 <CaseReel
                   key={r.userCaseId}
