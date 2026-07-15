@@ -5,6 +5,7 @@ import { Fragment, useEffect, useMemo, useState, FormEvent } from "react";
 import { GAME_MODES, type GameMode } from "@/components/gameModes";
 import Field from "./Field";
 import CaseLootEditor from "./CaseLootEditor";
+import CaseStatsModal from "./CaseStatsModal";
 
 type Item = {
   id: number;
@@ -41,6 +42,7 @@ export default function AdminCatalog() {
   const [form, setForm] = useState(emptyForm);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [lootEditor, setLootEditor] = useState<{ id: number; name: string } | null>(null);
+  const [statsModal, setStatsModal] = useState<{ id: number; name: string } | null>(null);
 
   // The API returns items in insertion order, mixing every mode together — group them by
   // game mode (in the site's canonical mode order) so the table reads mode by mode instead
@@ -365,6 +367,14 @@ export default function AdminCatalog() {
                               Содержимое
                             </button>
                           )}
+                          {item.is_case && (
+                            <button
+                              onClick={() => setStatsModal({ id: item.id, name: item.name })}
+                              className="border border-violet-400/40 px-2.5 py-1.5 text-xs text-violet-300 transition-colors duration-300 hover:border-violet-400/70 hover:text-white"
+                            >
+                              Статистика
+                            </button>
+                          )}
                           <button
                             onClick={() => toggleHidden(item)}
                             disabled={busyId === item.id}
@@ -395,6 +405,14 @@ export default function AdminCatalog() {
           caseId={lootEditor.id}
           caseName={lootEditor.name}
           onClose={() => setLootEditor(null)}
+        />
+      )}
+
+      {statsModal && (
+        <CaseStatsModal
+          caseId={statsModal.id}
+          caseName={statsModal.name}
+          onClose={() => setStatsModal(null)}
         />
       )}
     </div>

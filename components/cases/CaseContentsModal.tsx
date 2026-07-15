@@ -5,6 +5,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { RARITY_MAP, sortByRarity } from "@/lib/rarity";
+import { ITEM_TYPE_MAP } from "@/lib/itemType";
+import ItemIcon from "./ItemIcon";
 import type { CaseLootItem } from "./types";
 
 export default function CaseContentsModal({
@@ -69,14 +71,30 @@ export default function CaseContentsModal({
                   className="flex items-center justify-between border border-white/5 px-3 py-2"
                   style={{ background: `linear-gradient(90deg, ${meta.color}14, transparent)` }}
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="h-2.5 w-2.5 shrink-0" style={{ background: meta.color }} />
-                    <span className="truncate text-sm text-white">{item.name}</span>
-                    <span
-                      className="shrink-0 font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
-                      style={{ color: meta.color }}
-                    >
-                      {meta.label}
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <ItemIcon imageUrl={item.imageUrl} itemType={item.itemType} rarity={item.rarity} size={34} />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-sm text-white">{item.name}</span>
+                        {item.isUnique && (
+                          <span className="shrink-0 border border-amber-400/50 px-1 font-[var(--font-mono)] text-[9px] uppercase tracking-wide text-amber-300">
+                            уник
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-1.5">
+                        <span
+                          className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
+                          style={{ color: meta.color }}
+                        >
+                          {meta.label}
+                        </span>
+                        {item.itemType && (
+                          <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-mist)]">
+                            · {ITEM_TYPE_MAP[item.itemType].label}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </span>
                   <span className="ml-3 shrink-0 font-[var(--font-mono)] text-xs" style={{ color: meta.color }}>

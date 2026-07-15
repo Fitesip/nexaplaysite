@@ -11,6 +11,9 @@
 # misc
 .DS_Store
 
+# user-uploaded files (avatars, case item icons, …)
+/public/uploads/
+
 # local env files
 .env*.local
 

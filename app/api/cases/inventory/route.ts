@@ -1,5 +1,6 @@
-/** GET /api/cases/inventory — the logged-in user's owned cases: unopened ones (grouped by case)
- *  ready to open, and a history of already-opened cases with what dropped. */
+/** GET /api/cases/inventory — the logged-in user's cases: unopened ones (grouped by case) ready
+ *  to open, plus opened-but-not-yet-claimed rewards waiting to be collected. Opened+claimed cases
+ *  live in the paginated history endpoint (/api/cases/history). */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
@@ -25,12 +26,12 @@ export async function GET() {
     [userId]
   );
 
-  const [history]: any = await pool.query(
-    `SELECT id, case_id, case_name, game_mode, won_item_name, won_item_rarity, opened_at
+  // Opened rewards the player hasn't collected yet.
+  const [rewards]: any = await pool.query(
+    `SELECT id, case_name, game_mode, won_item_name, won_item_rarity, won_item_type, won_item_image, opened_at
      FROM user_cases
-     WHERE user_id = ? AND status = 'opened'
-     ORDER BY opened_at DESC
-     LIMIT 50`,
+     WHERE user_id = ? AND status = 'opened' AND claimed = 0
+     ORDER BY opened_at DESC`,
     [userId]
   );
 
@@ -42,8 +43,5 @@ export async function GET() {
     nextId: g.next_id, // the specific user_cases instance the client should open next
   }));
 
-  return NextResponse.json(
-    { unopened, history },
-    { headers: { "Cache-Control": "no-store" } }
-  );
+  return NextResponse.json({ unopened, rewards }, { headers: { "Cache-Control": "no-store" } });
 }

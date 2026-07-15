@@ -19,7 +19,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const [rows]: any = await pool.query(
-    `SELECT id, name, rarity, weight FROM case_items WHERE case_id = ? ORDER BY sort_order ASC, id ASC`,
+    `SELECT id, name, rarity, item_type, is_unique, image_url, weight
+     FROM case_items WHERE case_id = ? ORDER BY sort_order ASC, id ASC`,
     [caseId]
   );
 
@@ -28,6 +29,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     id: r.id,
     name: r.name,
     rarity: r.rarity,
+    itemType: r.item_type,
+    imageUrl: r.image_url,
+    isUnique: Boolean(r.is_unique),
     weight: r.weight,
     chance: totalWeight > 0 ? r.weight / totalWeight : 0,
   }));

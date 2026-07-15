@@ -9,10 +9,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RARITY_MAP, sortByRarity, type Rarity } from "@/lib/rarity";
+import { ITEM_TYPE_MAP, type ItemType } from "@/lib/itemType";
+import ItemIcon from "./ItemIcon";
 import type { CaseLootItem } from "./types";
 
 type OpenResult = {
-  won: { id: number; name: string; rarity: Rarity };
+  won: { id: number; name: string; rarity: Rarity; itemType: ItemType; imageUrl: string | null };
   items: CaseLootItem[];
   caseName: string;
 };
@@ -48,6 +50,16 @@ export default function CaseRoulette({
   const [mounted, setMounted] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const settledRef = useRef(false);
+
+  // Land on the result (either the reel finished, or the player skipped the animation).
+  // Guarded so onOpened() fires exactly once even if both paths trigger.
+  const settle = () => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    setPhase("done");
+    onOpened();
+  };
 
   // Render through a portal on <body> so the overlay isn't clipped by an ancestor
   // that establishes a containing block (the account card uses backdrop-filter).
@@ -77,6 +89,9 @@ export default function CaseRoulette({
           id: won.id,
           name: won.name,
           rarity: won.rarity,
+          itemType: won.itemType,
+          imageUrl: won.imageUrl,
+          isUnique: false,
           weight: 0,
           chance: 0,
         };
@@ -171,10 +186,7 @@ export default function CaseRoulette({
                   transform: `translateX(-${offset}px)`,
                   transition: phase === "spinning" ? "transform 5.6s cubic-bezier(0.12, 0.6, 0.04, 1)" : "none",
                 }}
-                onTransitionEnd={() => {
-                  setPhase("done");
-                  onOpened();
-                }}
+                onTransitionEnd={settle}
               >
                 {reel.map((item, idx) => {
                   const meta = RARITY_MAP[item.rarity];
@@ -194,11 +206,14 @@ export default function CaseRoulette({
                       }}
                     >
                       <span className="h-1.5 w-full" style={{ background: meta.gradient }} />
-                      <span className="mt-2 line-clamp-3 text-center text-xs font-medium text-white">
+                      <span className="mt-1 flex justify-center">
+                        <ItemIcon imageUrl={item.imageUrl} itemType={item.itemType} rarity={item.rarity} size={36} />
+                      </span>
+                      <span className="mt-1 line-clamp-2 text-center text-xs font-medium text-white">
                         {item.name}
                       </span>
                       <span
-                        className="mt-1 text-center font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
+                        className="text-center font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
                         style={{ color: meta.color }}
                       >
                         {meta.label}
@@ -219,17 +234,32 @@ export default function CaseRoulette({
                 />
                 <div className="case-drop">
                   <p className="text-xs uppercase tracking-wide text-[var(--color-mist)]">Вам выпало</p>
+                  <div className="mt-2 flex justify-center">
+                    <ItemIcon
+                      imageUrl={result.won.imageUrl}
+                      itemType={result.won.itemType}
+                      rarity={result.won.rarity}
+                      size={72}
+                    />
+                  </div>
                   <p
-                    className="mt-1 font-[var(--font-display)] text-2xl font-bold drop-shadow-[0_0_12px_currentColor] sm:text-3xl"
+                    className="mt-2 font-[var(--font-display)] text-2xl font-bold drop-shadow-[0_0_12px_currentColor] sm:text-3xl"
                     style={{ color: wonMeta.color }}
                   >
                     {result.won.name}
                   </p>
-                  <span
-                    className="mt-2 inline-block border px-3 py-1 font-[var(--font-mono)] text-xs uppercase tracking-wide"
-                    style={{ borderColor: `${wonMeta.color}66`, color: wonMeta.color }}
-                  >
-                    {wonMeta.label}
+                  <span className="mt-2 flex items-center justify-center gap-2">
+                    <span
+                      className="inline-block border px-3 py-1 font-[var(--font-mono)] text-xs uppercase tracking-wide"
+                      style={{ borderColor: `${wonMeta.color}66`, color: wonMeta.color }}
+                    >
+                      {wonMeta.label}
+                    </span>
+                    {result.won.itemType && (
+                      <span className="inline-block border border-white/15 px-3 py-1 font-[var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-mist)]">
+                        {ITEM_TYPE_MAP[result.won.itemType].label}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="mt-6 flex justify-center">
@@ -244,7 +274,15 @@ export default function CaseRoulette({
             )}
 
             {phase === "spinning" && (
-              <p className="mt-6 text-center text-sm text-[var(--color-mist)]">Крутим барабан…</p>
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <p className="text-sm text-[var(--color-mist)]">Крутим барабан…</p>
+                <button
+                  onClick={settle}
+                  className="border border-white/15 px-5 py-1.5 font-[var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-mist)] transition-colors hover:border-cyan-400/50 hover:text-white"
+                >
+                  Пропустить анимацию
+                </button>
+              </div>
             )}
 
 
@@ -263,7 +301,7 @@ export default function CaseRoulette({
                         className="flex items-center justify-between border border-white/5 px-3 py-1.5 text-sm"
                       >
                         <span className="flex items-center gap-2 truncate text-[var(--color-mist)]">
-                          <span className="h-2 w-2 shrink-0" style={{ background: meta.color }} />
+                          <ItemIcon imageUrl={item.imageUrl} itemType={item.itemType} rarity={item.rarity} size={24} />
                           <span className="truncate text-white">{item.name}</span>
                         </span>
                         <span className="ml-2 shrink-0 font-[var(--font-mono)] text-xs" style={{ color: meta.color }}>
