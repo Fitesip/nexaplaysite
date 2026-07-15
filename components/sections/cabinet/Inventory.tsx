@@ -15,6 +15,7 @@ import ItemIcon from "@/components/cases/ItemIcon";
 import type { CaseHistoryEntry, CaseReward, InventoryCase } from "@/components/cases/types";
 
 const HISTORY_PAGE_SIZE = 10;
+const REWARDS_PAGE_SIZE = 6;
 const MAX_BULK = 8;
 
 export default function Inventory() {
@@ -25,6 +26,7 @@ export default function Inventory() {
   const [bulk, setBulk] = useState<{ caseId: number; caseName: string; count: number } | null>(null);
   const [claiming, setClaiming] = useState<number | "all" | null>(null);
   const [bulkCounts, setBulkCounts] = useState<Record<string, number>>({});
+  const [rewardsPage, setRewardsPage] = useState(1);
 
   // history + filters
   const [history, setHistory] = useState<CaseHistoryEntry[]>([]);
@@ -103,6 +105,16 @@ export default function Inventory() {
   const totalCases = unopened.reduce((sum, c) => sum + c.count, 0);
   const totalPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
   const hasFilters = search.trim() !== "" || rarityFilter !== "";
+
+  const rewardsPages = Math.max(1, Math.ceil(rewards.length / REWARDS_PAGE_SIZE));
+  // Keep the current page in range as rewards get claimed.
+  useEffect(() => {
+    setRewardsPage((p) => Math.min(p, Math.max(1, Math.ceil(rewards.length / REWARDS_PAGE_SIZE))));
+  }, [rewards.length]);
+  const pagedRewards = rewards.slice(
+    (rewardsPage - 1) * REWARDS_PAGE_SIZE,
+    rewardsPage * REWARDS_PAGE_SIZE
+  );
 
   return (
     <div className="glass-panel pixel-corner mt-6 p-6">
@@ -194,7 +206,7 @@ export default function Inventory() {
             <div className="mt-6 border-t border-white/10 pt-5">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-xs uppercase tracking-wide text-[var(--color-mist)]">
-                  Награды к получению
+                  Награды к получению <span className="text-[var(--color-mist)]/60">({rewards.length})</span>
                 </p>
                 <button
                   onClick={() => claim("all")}
@@ -205,7 +217,7 @@ export default function Inventory() {
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {rewards.map((r) => {
+                {pagedRewards.map((r) => {
                   const meta = r.won_item_rarity ? RARITY_MAP[r.won_item_rarity] : null;
                   return (
                     <div
@@ -246,6 +258,28 @@ export default function Inventory() {
                   );
                 })}
               </div>
+
+              {rewardsPages > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setRewardsPage((p) => Math.max(1, p - 1))}
+                    disabled={rewardsPage <= 1}
+                    className="border border-white/15 px-3 py-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)] transition-colors hover:text-white disabled:opacity-40"
+                  >
+                    ← Назад
+                  </button>
+                  <span className="font-[var(--font-mono)] text-xs text-[var(--color-mist)]">
+                    {rewardsPage} / {rewardsPages}
+                  </span>
+                  <button
+                    onClick={() => setRewardsPage((p) => Math.min(rewardsPages, p + 1))}
+                    disabled={rewardsPage >= rewardsPages}
+                    className="border border-white/15 px-3 py-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)] transition-colors hover:text-white disabled:opacity-40"
+                  >
+                    Вперёд →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

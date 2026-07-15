@@ -11,6 +11,19 @@ import OrderHistory from "./OrderHistory";
 import ChangePasswordForm from "./ChangePasswordForm";
 import { ROLE_LABEL, type User } from "./types";
 
+type ProfileTab = "profile" | "minecraft" | "cases" | "orders" | "support" | "referral" | "password";
+
+/** Side-nav sections, in display order. Referral sits right before password by request. */
+const PROFILE_TABS: { id: ProfileTab; label: string }[] = [
+  { id: "profile", label: "Профиль" },
+  { id: "minecraft", label: "Minecraft" },
+  { id: "cases", label: "Инвентарь" },
+  { id: "orders", label: "История заказов" },
+  { id: "support", label: "Поддержка" },
+  { id: "referral", label: "Реферальная программа" },
+  { id: "password", label: "Смена пароля" },
+];
+
 /**
  * The main "logged in" view of the cabinet: avatar (click to upload a new one),
  * an inline-editable username, basic stats, a logout button, and the stack of
@@ -26,6 +39,7 @@ export default function Profile({
   onUserUpdate: (patch: Partial<User>) => void;
 }) {
   const logout = onLogout;
+  const [tab, setTab] = useState<ProfileTab>("profile");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -99,8 +113,29 @@ export default function Profile({
   };
 
   return (
-    <div className="mx-auto max-w-xl">
-      <div className="glass-panel pixel-corner p-8 text-center">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 md:flex-row md:items-start">
+      <nav className="md:w-56 md:shrink-0">
+        <div className="glass-panel pixel-corner flex gap-1 overflow-x-auto p-2 md:flex-col md:overflow-visible">
+          {PROFILE_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-left font-[var(--font-display)] text-sm transition-colors md:w-full ${
+                tab === t.id
+                  ? "bg-gradient-to-r from-violet-600 to-cyan-500 text-white"
+                  : "text-[var(--color-mist)] hover:text-white"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <div className="min-w-0 flex-1">
+        {tab === "profile" && (
+        <div className="glass-panel pixel-corner p-8 text-center">
         {/* avatar: click to upload, hover reveals the pencil icon */}
         <div className="relative mx-auto h-20 w-20">
           <button
@@ -223,14 +258,16 @@ export default function Profile({
         >
           Выйти из аккаунта
         </button>
-      </div>
+        </div>
+        )}
 
-      <MinecraftLinkCard user={user} onUserUpdate={onUserUpdate} />
-      <ReferralCard />
-      <Inventory />
-      <OrderHistory />
-      <SupportChat />
-      <ChangePasswordForm />
+        {tab === "minecraft" && <MinecraftLinkCard user={user} onUserUpdate={onUserUpdate} />}
+        {tab === "cases" && <Inventory />}
+        {tab === "orders" && <OrderHistory />}
+        {tab === "support" && <SupportChat />}
+        {tab === "referral" && <ReferralCard />}
+        {tab === "password" && <ChangePasswordForm />}
+      </div>
     </div>
   );
 }
