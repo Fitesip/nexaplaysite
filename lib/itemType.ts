@@ -41,3 +41,10 @@ export function isItemType(value: unknown): value is ItemType {
 export function isAlwaysUniqueItemType(itemType: ItemType): boolean {
   return ALWAYS_UNIQUE_ITEM_TYPES.has(itemType);
 }
+
+export function itemOwnershipKey(itemType: string, name: string): string {
+  return JSON.stringify([
+    itemType.trim().toLocaleLowerCase("ru-RU"),
+    name.normalize("NFKC").trim().toLocaleLowerCase("ru-RU"),
+  ]);
+}

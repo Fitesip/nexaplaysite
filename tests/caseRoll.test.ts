@@ -7,6 +7,7 @@ import {
   type RollItem,
 } from "@/lib/caseRoll";
 import { DEFAULT_RARITY_WEIGHT } from "@/lib/rarity";
+import { itemOwnershipKey } from "@/lib/itemType";
 
 describe("weightedPick", () => {
   const items = [
@@ -80,6 +81,15 @@ describe("eligibleItems (unique-reward exclusion)", () => {
     expect(eligible.map((i) => i.id)).toEqual([2, 3]);
   });
 
+  it("uses item identity instead of a replaceable case_items row id", () => {
+    const ownershipId = itemOwnershipKey("title", "Герой");
+    const recreatedPool = [
+      { id: 99, ownership_id: ownershipId, is_unique: true },
+      { id: 100, ownership_id: itemOwnershipKey("item", "Камень"), is_unique: false },
+    ];
+    expect(eligibleItems(recreatedPool, new Set([ownershipId])).map((item) => item.id)).toEqual([100]);
+  });
+
   it("does not award the same unique twice within one batch", () => {
     // Mirror the bulk-open loop: after winning a unique, add its id to the owned set so the
     // next draw excludes it (`?? last` mirrors the route's degenerate-pool fallback).
@@ -87,7 +97,7 @@ describe("eligibleItems (unique-reward exclusion)", () => {
       { id: 1, ownership_id: 1, rarity: "common", weight: 5 },
       { id: 2, ownership_id: 2, rarity: "legendary", weight: 5, is_unique: true },
     ];
-    const owned = new Set<number>();
+    const owned = new Set<string | number>();
     const wins: number[] = [];
     for (let i = 0; i < 10; i++) {
       const candidates = eligibleItems(batchPool, owned);
