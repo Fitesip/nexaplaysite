@@ -7,6 +7,7 @@ import { getPool } from "@/lib/db";
 import { signSession, setSessionCookie } from "@/lib/auth";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { notify } from "@/lib/notify";
+import { REFERRAL_SIGNUP_BONUS_KOPECKS } from "@/lib/rubleBalance";
 
 const schema = z.object({
   username: z
@@ -68,9 +69,12 @@ export async function POST(req: NextRequest) {
 
   const hash = await bcrypt.hash(password, 10);
   const referralCode = await generateReferralCode(pool);
+  const signupBonusKopecks = referrerId ? REFERRAL_SIGNUP_BONUS_KOPECKS : 0;
   const [result]: any = await pool.query(
-    "INSERT INTO users (username, email, password_hash, referral_code, referred_by) VALUES (?, ?, ?, ?, ?)",
-    [username, email, hash, referralCode, referrerId]
+    `INSERT INTO users
+       (username, email, password_hash, referral_code, referred_by, balance_kopecks)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [username, email, hash, referralCode, referrerId, signupBonusKopecks]
   );
 
   const userId = result.insertId as number;
@@ -82,18 +86,24 @@ export async function POST(req: NextRequest) {
       userId: referrerId,
       type: "referral_joined",
       title: "У вас новый реферал",
-      body: `Игрок ${username} зарегистрировался по вашей ссылке.`,
+      body: `Игрок ${username} зарегистрировался по вашей ссылке и получил 25 ₽.`,
       link: "#cabinet",
     });
   }
 
   const [rows]: any = await pool.query(
-    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, game_currency, created_at FROM users WHERE id = ?",
+    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, game_currency, balance_kopecks, created_at FROM users WHERE id = ?",
     [userId]
   );
 
   return NextResponse.json(
-    { user: { ...rows[0], game_currency: Number(rows[0].game_currency) } },
+    {
+      user: {
+        ...rows[0],
+        game_currency: Number(rows[0].game_currency),
+        balance_kopecks: Number(rows[0].balance_kopecks),
+      },
+    },
     { status: 201 }
   );
 }

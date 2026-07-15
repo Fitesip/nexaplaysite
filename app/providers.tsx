@@ -7,16 +7,19 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AdminChatsProvider } from "@/lib/admin-chats-context";
 import { NotificationsProvider } from "@/lib/notifications-context";
 import { SocketProvider } from "@/lib/socket-context";
+import BalanceSync from "@/lib/balance-sync";
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <SocketProvider>
-        <AdminChatsProvider>
-          <NotificationsProvider>
-            <CartProvider>{children}</CartProvider>
-          </NotificationsProvider>
-        </AdminChatsProvider>
+        <BalanceSync>
+          <AdminChatsProvider>
+            <NotificationsProvider>
+              <CartProvider>{children}</CartProvider>
+            </NotificationsProvider>
+          </AdminChatsProvider>
+        </BalanceSync>
       </SocketProvider>
     </AuthProvider>
   );

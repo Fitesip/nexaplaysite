@@ -37,9 +37,15 @@ export async function PATCH(req: NextRequest) {
   await pool.query("UPDATE users SET username = ? WHERE id = ?", [username, userId]);
 
   const [rows]: any = await pool.query(
-    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, created_at FROM users WHERE id = ?",
+    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, game_currency, balance_kopecks, created_at FROM users WHERE id = ?",
     [userId]
   );
 
-  return NextResponse.json({ user: rows[0] });
+  return NextResponse.json({
+    user: {
+      ...rows[0],
+      game_currency: Number(rows[0].game_currency),
+      balance_kopecks: Number(rows[0].balance_kopecks),
+    },
+  });
 }

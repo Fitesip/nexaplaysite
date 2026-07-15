@@ -52,8 +52,14 @@ export async function GET(req: NextRequest) {
     [...values, PAGE_SIZE, offset]
   );
 
+  const items = rows.map((row: any) => ({
+    ...row,
+    compensated: Boolean(row.compensated),
+    compensation_amount: Number(row.compensation_amount),
+  }));
+
   return NextResponse.json(
-    { items: rows, total, page: safePage, pageCount, pageSize: PAGE_SIZE },
+    { items, total, page: safePage, pageCount, pageSize: PAGE_SIZE },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

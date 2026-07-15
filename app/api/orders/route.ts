@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId, requirePurchaseAccess } from "@/lib/auth";
+import { referralPurchaseRewardKopecks } from "@/lib/rubleBalance";
+import { sendToUser } from "@/lib/ws-hub";
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -51,7 +53,14 @@ const schema = z.object({
     )
     .min(1, "Корзина пуста"),
   promoCode: z.string().trim().min(1).optional(),
+  requestId: z.string().uuid(),
 });
+
+type DatabaseError = Error & { code?: string };
+
+function isDuplicateEntry(error: unknown): boolean {
+  return error instanceof Error && (error as DatabaseError).code === "ER_DUP_ENTRY";
+}
 
 export async function POST(req: NextRequest) {
   const gate = await requirePurchaseAccess();
@@ -65,12 +74,38 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { items, promoCode } = parsed.data;
+  const { items, promoCode, requestId } = parsed.data;
 
   const pool = getPool();
   const conn = await pool.getConnection();
+  let referrerBalanceUpdate: { userId: number; balanceKopecks: number } | null = null;
   try {
     await conn.beginTransaction();
+
+    const [existingOrders]: any = await conn.query(
+      `SELECT id, subtotal, discount_amount, total
+       FROM orders
+       WHERE user_id = ? AND checkout_request_id = ?
+       LIMIT 1`,
+      [userId, requestId]
+    );
+    if (existingOrders[0]) {
+      await conn.rollback();
+      return NextResponse.json({
+        ok: true,
+        orderId: existingOrders[0].id,
+        subtotal: existingOrders[0].subtotal,
+        discountAmount: existingOrders[0].discount_amount,
+        total: existingOrders[0].total,
+      });
+    }
+
+    const [buyerRows]: any = await conn.query(
+      "SELECT referred_by FROM users WHERE id = ?",
+      [userId]
+    );
+    const referredBy = buyerRows[0]?.referred_by ? Number(buyerRows[0].referred_by) : null;
+    const referrerId = referredBy && referredBy !== userId ? referredBy : null;
 
     const ids = items.map((i) => Number(i.id));
     const [catalogRows]: any = await conn.query(
@@ -178,11 +213,13 @@ export async function POST(req: NextRequest) {
     }
 
     const total = Math.max(0, subtotal - discountAmount);
+    const referralRewardKopecks = referrerId ? referralPurchaseRewardKopecks(total) : 0;
 
     const [orderResult]: any = await conn.query(
-      `INSERT INTO orders (user_id, subtotal, discount_amount, total, promo_code)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, subtotal, discountAmount, total, appliedCode]
+      `INSERT INTO orders
+         (user_id, subtotal, discount_amount, total, promo_code, checkout_request_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, subtotal, discountAmount, total, appliedCode, requestId]
     );
     const orderId = orderResult.insertId;
 
@@ -210,11 +247,55 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (referrerId && referralRewardKopecks > 0) {
+      const [rewardResult]: any = await conn.query(
+        `UPDATE users
+         SET balance_kopecks = balance_kopecks + ?
+         WHERE id = ?`,
+        [referralRewardKopecks, referrerId]
+      );
+      if (rewardResult.affectedRows > 0) {
+        const [balanceRows]: any = await conn.query(
+          "SELECT balance_kopecks FROM users WHERE id = ?",
+          [referrerId]
+        );
+        referrerBalanceUpdate = {
+          userId: referrerId,
+          balanceKopecks: Number(balanceRows[0].balance_kopecks),
+        };
+      }
+    }
+
     await conn.commit();
+
+    if (referrerBalanceUpdate) {
+      sendToUser(referrerBalanceUpdate.userId, {
+        type: "balance_update",
+        data: { balanceKopecks: referrerBalanceUpdate.balanceKopecks },
+      });
+    }
 
     return NextResponse.json({ ok: true, orderId, subtotal, discountAmount, total }, { status: 201 });
   } catch (err) {
     await conn.rollback();
+    if (isDuplicateEntry(err)) {
+      const [existingOrders]: any = await pool.query(
+        `SELECT id, subtotal, discount_amount, total
+         FROM orders
+         WHERE user_id = ? AND checkout_request_id = ?
+         LIMIT 1`,
+        [userId, requestId]
+      );
+      if (existingOrders[0]) {
+        return NextResponse.json({
+          ok: true,
+          orderId: existingOrders[0].id,
+          subtotal: existingOrders[0].subtotal,
+          discountAmount: existingOrders[0].discount_amount,
+          total: existingOrders[0].total,
+        });
+      }
+    }
     throw err;
   } finally {
     conn.release();
