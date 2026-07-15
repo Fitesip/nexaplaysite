@@ -10,6 +10,7 @@ export const ITEM_TYPES = [
   "cosmetic",
   "pet",
   "title",
+  "rubles",
   "other",
 ] as const;
 
@@ -31,6 +32,7 @@ export const ITEM_TYPE_MAP: Record<ItemType, ItemTypeMeta> = {
   cosmetic: { id: "cosmetic", label: "Косметика", icon: "✨" },
   pet: { id: "pet", label: "Питомец", icon: "🐾" },
   title: { id: "title", label: "Титул", icon: "🏷️" },
+  rubles: { id: "rubles", label: "Рубли", icon: "₽" },
   other: { id: "other", label: "Другое", icon: "🎁" },
 };
 

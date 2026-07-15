@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
 
   const [rows]: any = await pool.query(
     `SELECT id, case_id, case_name, game_mode, won_item_name, won_item_rarity,
-            won_item_type, won_item_image, compensated, compensation_amount, opened_at
+            won_item_type, won_item_image, compensated, compensation_amount,
+            won_ruble_amount_kopecks, opened_at
      FROM user_cases
      WHERE ${whereSql}
      ORDER BY opened_at DESC
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest) {
     ...row,
     compensated: Boolean(row.compensated),
     compensation_amount: Number(row.compensation_amount),
+    won_ruble_amount_kopecks: Number(row.won_ruble_amount_kopecks),
   }));
 
   return NextResponse.json(

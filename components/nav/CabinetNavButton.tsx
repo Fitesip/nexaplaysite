@@ -31,7 +31,7 @@ export default function CabinetNavButton({
       )}
       <span className="hidden sm:inline">{user ? user.username : "Кабинет"}</span>
       {user && (
-        <span className="font-[var(--font-mono)] text-[11px] text-cyan-300">
+        <span className="inline-flex h-5 items-center font-[var(--font-mono)] text-[11px] leading-none text-cyan-300">
           {formatRubleBalance(user.balance_kopecks)}
         </span>
       )}

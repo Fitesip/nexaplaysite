@@ -11,6 +11,7 @@ import ItemIcon from "./ItemIcon";
 import CaseReel from "./CaseReel";
 import type { BulkOpenResult, CaseLootItem } from "./types";
 import { useAuth } from "@/lib/auth-context";
+import { formatRubleBalance } from "@/lib/rubleBalance";
 
 export default function CaseBulkResult({
   caseId,
@@ -25,7 +26,7 @@ export default function CaseBulkResult({
   onClose: () => void;
   onOpened: () => void;
 }) {
-  const { user, setUser } = useAuth();
+  const { setUser } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<"loading" | "spinning" | "error">("loading");
   const [error, setError] = useState("");
@@ -59,9 +60,17 @@ export default function CaseBulkResult({
         }
         setResults(data.results ?? []);
         setPool(data.items ?? []);
-        if (user) {
-          setUser({ ...user, game_currency: Number(data.balance ?? user.game_currency) });
-        }
+        setUser((current) =>
+          current
+            ? {
+                ...current,
+                game_currency: Number(data.balance ?? current.game_currency),
+                balance_kopecks: Number(
+                  data.rubleBalanceKopecks ?? current.balance_kopecks
+                ),
+              }
+            : current
+        );
         setPhase("spinning");
         onOpened();
       } catch {
@@ -69,7 +78,7 @@ export default function CaseBulkResult({
         setPhase("error");
       }
     })();
-  }, [caseId, count, onOpened, user, setUser]);
+  }, [caseId, count, onOpened, setUser]);
 
   const allSettled = results.length > 0 && settledCount >= results.length;
   const summary = useMemo(() => sortByRarity(results), [results]);
@@ -169,6 +178,11 @@ export default function CaseBulkResult({
                           {r.compensated && (
                             <span className="font-[var(--font-mono)] text-[9px] text-amber-300">
                               Компенсация: {r.compensationAmount.toLocaleString("ru-RU")} монет
+                            </span>
+                          )}
+                          {r.rubleAmountKopecks > 0 && (
+                            <span className="font-[var(--font-mono)] text-[9px] text-emerald-300">
+                              Зачислено: {formatRubleBalance(r.rubleAmountKopecks)}
                             </span>
                           )}
                         </div>

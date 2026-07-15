@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { normalizeGrantCommand, validateGrantCommand } from "@/lib/itemGrant";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
@@ -14,6 +15,7 @@ const schema = z.object({
   hidden: z.boolean().optional(),
   oneTimePurchase: z.boolean().optional(),
   isCase: z.boolean().optional(),
+  grantCommand: z.string().trim().max(500).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +37,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const fields = parsed.data;
+  const pool = getPool();
+  const [itemRows]: any = await pool.query(
+    "SELECT is_case FROM catalog_items WHERE id = ? LIMIT 1",
+    [itemId]
+  );
+  if (!itemRows[0]) {
+    return NextResponse.json({ error: "Товар не найден" }, { status: 404 });
+  }
+  const finalIsCase = fields.isCase ?? Boolean(itemRows[0].is_case);
   const sets: string[] = [];
   const values: unknown[] = [];
 
@@ -74,12 +85,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     sets.push("is_case = ?");
     values.push(fields.isCase ? 1 : 0);
   }
+  if (fields.grantCommand !== undefined || fields.isCase === true) {
+    const grantCommand = finalIsCase ? null : normalizeGrantCommand(fields.grantCommand);
+    const grantCommandError = validateGrantCommand(grantCommand);
+    if (grantCommandError) {
+      return NextResponse.json({ error: grantCommandError }, { status: 400 });
+    }
+    sets.push("grant_command = ?");
+    values.push(grantCommand);
+  }
 
   if (sets.length === 0) {
     return NextResponse.json({ error: "Нечего обновлять" }, { status: 400 });
   }
 
-  const pool = getPool();
   const [result]: any = await pool.query(
     `UPDATE catalog_items SET ${sets.join(", ")} WHERE id = ?`,
     [...values, itemId]

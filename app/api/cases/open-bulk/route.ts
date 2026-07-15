@@ -8,6 +8,12 @@ import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
 import { eligibleItems, weightedPick } from "@/lib/caseRoll";
 import { itemOwnershipKey } from "@/lib/itemType";
+import { sendToUser } from "@/lib/ws-hub";
+import {
+  caseRewardCredits,
+  sumCaseRewardCredits,
+  type CaseRewardCredits,
+} from "@/lib/caseReward";
 
 const MAX_BULK = 8;
 
@@ -51,7 +57,8 @@ export async function POST(req: NextRequest) {
     }
 
     const [pool_]: any = await conn.query(
-      `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency, weight
+      `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency,
+              grant_command, ruble_amount_kopecks, weight
        FROM case_items
        WHERE case_id = ?
        ORDER BY sort_order ASC, id ASC`,
@@ -67,6 +74,8 @@ export async function POST(req: NextRequest) {
       weight: number;
       is_unique: boolean;
       price_currency: number;
+      grant_command: string | null;
+      ruble_amount_kopecks: number;
     }[] = pool_
       .filter((r: any) => r.weight > 0)
       .map((r: any) => ({
@@ -79,6 +88,8 @@ export async function POST(req: NextRequest) {
         weight: r.weight,
         is_unique: Boolean(r.is_unique),
         price_currency: Number(r.price_currency),
+        grant_command: r.grant_command,
+        ruble_amount_kopecks: Number(r.ruble_amount_kopecks),
       }));
     if (lootItems.length === 0) {
       await conn.rollback();
@@ -103,21 +114,31 @@ export async function POST(req: NextRequest) {
       imageUrl: string | null;
       compensated: boolean;
       compensationAmount: number;
+      rubleAmountKopecks: number;
     }[] = [];
-    let totalCompensation = 0;
+    const rewardCredits: CaseRewardCredits[] = [];
 
     for (const owned of caseRows) {
       const candidates = eligibleItems(lootItems, ownedUniqueIds);
       const won = weightedPick(candidates) ?? candidates[candidates.length - 1];
       const compensated = won.is_unique && ownedUniqueIds.has(won.ownership_id);
-      const compensationAmount = compensated ? won.price_currency : 0;
+      const credits = caseRewardCredits(
+        won.item_type,
+        compensated,
+        won.price_currency,
+        won.ruble_amount_kopecks
+      );
+      const compensationAmount = credits.gameCurrency;
+      const rubleAmountKopecks = credits.rubleBalanceKopecks;
+      const autoClaimed = credits.autoClaimed;
       if (won.is_unique && !compensated) ownedUniqueIds.add(won.ownership_id);
-      totalCompensation += compensationAmount;
+      rewardCredits.push(credits);
 
       await conn.query(
         `UPDATE user_cases
          SET status = 'opened', won_case_item_id = ?, won_item_name = ?, won_item_rarity = ?,
-             won_item_type = ?, won_item_image = ?, compensation_amount = ?,
+             won_item_type = ?, won_item_image = ?, won_grant_command = ?,
+             won_ruble_amount_kopecks = ?, compensation_amount = ?,
              compensated = ?, claimed = ?, claimed_at = CASE WHEN ? = 1 THEN NOW() ELSE NULL END,
              opened_at = NOW()
          WHERE id = ?`,
@@ -127,10 +148,12 @@ export async function POST(req: NextRequest) {
           won.rarity,
           won.item_type,
           won.image_url,
+          won.grant_command,
+          rubleAmountKopecks,
           compensationAmount,
           compensated ? 1 : 0,
-          compensated ? 1 : 0,
-          compensated ? 1 : 0,
+          autoClaimed ? 1 : 0,
+          autoClaimed ? 1 : 0,
           owned.id,
         ]
       );
@@ -144,20 +167,32 @@ export async function POST(req: NextRequest) {
         imageUrl: won.image_url,
         compensated,
         compensationAmount,
+        rubleAmountKopecks,
       });
     }
 
-    if (totalCompensation > 0) {
+    const totals = sumCaseRewardCredits(rewardCredits);
+    const totalCompensation = totals.gameCurrency;
+    const totalRubleAmountKopecks = totals.rubleBalanceKopecks;
+    if (totalCompensation > 0 || totalRubleAmountKopecks > 0) {
       await conn.query(
-        `UPDATE users SET game_currency = game_currency + ? WHERE id = ?`,
-        [totalCompensation, userId]
+        `UPDATE users
+         SET game_currency = game_currency + ?, balance_kopecks = balance_kopecks + ?
+         WHERE id = ?`,
+        [totalCompensation, totalRubleAmountKopecks, userId]
       );
     }
     const [balanceRows]: any = await conn.query(
-      `SELECT game_currency FROM users WHERE id = ?`,
+      `SELECT game_currency, balance_kopecks FROM users WHERE id = ?`,
       [userId]
     );
     await conn.commit();
+    if (totalRubleAmountKopecks > 0) {
+      sendToUser(userId, {
+        type: "balance_update",
+        data: { balanceKopecks: Number(balanceRows[0]?.balance_kopecks ?? 0) },
+      });
+    }
 
     // Full droppable pool (weight > 0) so the client can build the reel strips.
     const totalWeight = lootItems.reduce((sum, i) => sum + i.weight, 0);
@@ -170,6 +205,7 @@ export async function POST(req: NextRequest) {
       isUnique: i.is_unique,
       weight: i.weight,
       chance: totalWeight > 0 ? i.weight / totalWeight : 0,
+      rubleAmountKopecks: i.ruble_amount_kopecks,
     }));
 
     return NextResponse.json({
@@ -180,6 +216,8 @@ export async function POST(req: NextRequest) {
       items,
       totalCompensation,
       balance: Number(balanceRows[0]?.game_currency ?? 0),
+      totalRubleAmountKopecks,
+      rubleBalanceKopecks: Number(balanceRows[0]?.balance_kopecks ?? 0),
     });
   } catch (err) {
     await conn.rollback();

@@ -13,6 +13,7 @@ import CaseRoulette from "@/components/cases/CaseRoulette";
 import CaseBulkResult from "@/components/cases/CaseBulkResult";
 import ItemIcon from "@/components/cases/ItemIcon";
 import type { CaseHistoryEntry, CaseReward, InventoryCase } from "@/components/cases/types";
+import { formatRubleBalance } from "@/lib/rubleBalance";
 
 const HISTORY_PAGE_SIZE = 10;
 const REWARDS_PAGE_SIZE = 6;
@@ -25,6 +26,7 @@ export default function Inventory() {
   const [opening, setOpening] = useState<{ userCaseId: number; caseName: string } | null>(null);
   const [bulk, setBulk] = useState<{ caseId: number; caseName: string; count: number } | null>(null);
   const [claiming, setClaiming] = useState<number | "all" | null>(null);
+  const [claimError, setClaimError] = useState("");
   const [bulkCounts, setBulkCounts] = useState<Record<string, number>>({});
   const [rewardsPage, setRewardsPage] = useState(1);
 
@@ -90,13 +92,18 @@ export default function Inventory() {
 
   const claim = async (target: number | "all") => {
     setClaiming(target);
+    setClaimError("");
     try {
-      await fetch("/api/cases/claim", {
+      const res = await fetch("/api/cases/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(target === "all" ? { all: true } : { userCaseId: target }),
       });
+      const data = await res.json().catch(() => null);
       refreshAll();
+      if (!res.ok) throw new Error(data?.error ?? "Не удалось получить награду");
+    } catch (error) {
+      setClaimError(error instanceof Error ? error.message : "Не удалось получить награду");
     } finally {
       setClaiming(null);
     }
@@ -280,6 +287,7 @@ export default function Inventory() {
                   </button>
                 </div>
               )}
+              {claimError && <p className="mt-3 text-sm text-rose-400">{claimError}</p>}
             </div>
           )}
 
@@ -347,6 +355,11 @@ export default function Inventory() {
                             {h.compensated && (
                               <span className="ml-2 text-amber-300">
                                 (компенсация {Number(h.compensation_amount).toLocaleString("ru-RU")} монет)
+                              </span>
+                            )}
+                            {h.won_ruble_amount_kopecks > 0 && (
+                              <span className="ml-2 text-emerald-300">
+                                (зачислено {formatRubleBalance(h.won_ruble_amount_kopecks)})
                               </span>
                             )}
                           </span>
