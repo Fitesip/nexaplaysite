@@ -1,13 +1,15 @@
 "use client";
 
-/** Overlay that opens several cases at once (POST /api/cases/open-bulk) and shows every drop in a
- *  grid — no reel, since mass opening is the "skip the animation" path by design. */
+/** Overlay that opens several cases at once (POST /api/cases/open-bulk) and plays a roulette reel
+ *  for every drop. The winners are decided server-side; each reel just lands on its result. A
+ *  "skip all" button snaps every reel straight to the drop. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RARITY_MAP, sortByRarity } from "@/lib/rarity";
 import { ITEM_TYPE_MAP } from "@/lib/itemType";
 import ItemIcon from "./ItemIcon";
-import type { BulkOpenResult } from "./types";
+import CaseReel from "./CaseReel";
+import type { BulkOpenResult, CaseLootItem } from "./types";
 
 export default function CaseBulkResult({
   caseId,
@@ -23,9 +25,12 @@ export default function CaseBulkResult({
   onOpened: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [phase, setPhase] = useState<"loading" | "done" | "error">("loading");
+  const [phase, setPhase] = useState<"loading" | "spinning" | "error">("loading");
   const [error, setError] = useState("");
   const [results, setResults] = useState<BulkOpenResult[]>([]);
+  const [pool, setPool] = useState<CaseLootItem[]>([]);
+  const [skipAll, setSkipAll] = useState(false);
+  const [settledCount, setSettledCount] = useState(0);
   const startedRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
@@ -51,7 +56,8 @@ export default function CaseBulkResult({
           return;
         }
         setResults(data.results ?? []);
-        setPhase("done");
+        setPool(data.items ?? []);
+        setPhase("spinning");
         onOpened();
       } catch {
         setError("Не удалось открыть кейсы");
@@ -60,7 +66,8 @@ export default function CaseBulkResult({
     })();
   }, [caseId, count, onOpened]);
 
-  const sorted = useMemo(() => sortByRarity(results), [results]);
+  const allSettled = results.length > 0 && settledCount >= results.length;
+  const summary = useMemo(() => sortByRarity(results), [results]);
 
   if (!mounted) return null;
 
@@ -95,46 +102,80 @@ export default function CaseBulkResult({
           </div>
         )}
 
-        {phase === "done" && (
+        {phase === "spinning" && (
           <>
             <p className="mt-2 text-sm text-[var(--color-mist)]">
               Открыто кейсов: <span className="text-white">{results.length}</span>
             </p>
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {sorted.map((r, idx) => {
-                const meta = RARITY_MAP[r.rarity];
-                return (
-                  <div
-                    key={`${r.userCaseId}-${idx}`}
-                    className="case-drop flex flex-col items-center gap-1.5 border p-3 text-center"
-                    style={{
-                      borderColor: `${meta.color}55`,
-                      background: `linear-gradient(180deg, ${meta.color}1c, transparent)`,
-                    }}
-                  >
-                    <ItemIcon imageUrl={r.imageUrl} itemType={r.itemType} rarity={r.rarity} size={44} />
-                    <span className="line-clamp-2 text-xs font-medium text-white">{r.name}</span>
-                    <span
-                      className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
-                      style={{ color: meta.color }}
-                    >
-                      {meta.label}
-                    </span>
-                    <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-mist)]">
-                      {ITEM_TYPE_MAP[r.itemType].label}
-                    </span>
+
+            <div className="mt-5 flex flex-col gap-2">
+              {results.map((r, idx) => (
+                <CaseReel
+                  key={r.userCaseId}
+                  pool={pool}
+                  won={r}
+                  skip={skipAll}
+                  spinDelay={skipAll ? 0 : idx * 220}
+                  onSettled={() => setSettledCount((n) => n + 1)}
+                />
+              ))}
+            </div>
+
+            {!allSettled && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setSkipAll(true)}
+                  className="border border-white/15 px-5 py-1.5 font-[var(--font-mono)] text-xs uppercase tracking-wide text-[var(--color-mist)] transition-colors hover:border-cyan-400/50 hover:text-white"
+                >
+                  Пропустить анимацию
+                </button>
+              </div>
+            )}
+
+            {allSettled && (
+              <>
+                <div className="mt-7 border-t border-white/10 pt-5">
+                  <p className="mb-3 text-xs uppercase tracking-wide text-[var(--color-mist)]">
+                    Ваши награды
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {summary.map((r, idx) => {
+                      const meta = RARITY_MAP[r.rarity];
+                      return (
+                        <div
+                          key={`${r.userCaseId}-${idx}`}
+                          className="case-drop flex flex-col items-center gap-1.5 border p-3 text-center"
+                          style={{
+                            borderColor: `${meta.color}55`,
+                            background: `linear-gradient(180deg, ${meta.color}1c, transparent)`,
+                          }}
+                        >
+                          <ItemIcon imageUrl={r.imageUrl} itemType={r.itemType} rarity={r.rarity} size={44} />
+                          <span className="line-clamp-2 text-xs font-medium text-white">{r.name}</span>
+                          <span
+                            className="font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
+                            style={{ color: meta.color }}
+                          >
+                            {meta.label}
+                          </span>
+                          <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-mist)]">
+                            {ITEM_TYPE_MAP[r.itemType].label}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={onClose}
-                className="pixel-corner bg-gradient-to-r from-violet-600 to-cyan-500 px-8 py-2.5 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.02]"
-              >
-                Забрать всё
-              </button>
-            </div>
+                </div>
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={onClose}
+                    className="pixel-corner bg-gradient-to-r from-violet-600 to-cyan-500 px-8 py-2.5 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.02]"
+                  >
+                    Забрать всё
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

@@ -52,6 +52,7 @@ export type CaseReward = {
 /** One drop from a bulk (multi-case) opening. */
 export type BulkOpenResult = {
   userCaseId: number;
+  id: number;
   name: string;
   rarity: Rarity;
   itemType: ItemType;

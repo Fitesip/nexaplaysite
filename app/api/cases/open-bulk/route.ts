@@ -8,7 +8,7 @@ import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
 import { eligibleItems, weightedPick } from "@/lib/caseRoll";
 
-const MAX_BULK = 50;
+const MAX_BULK = 8;
 
 const schema = z.object({
   caseId: z.union([z.string(), z.number()]),
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
 
     const results: {
       userCaseId: number;
+      id: number;
       name: string;
       rarity: string;
       itemType: string;
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
 
       results.push({
         userCaseId: owned.id,
+        id: won.id,
         name: won.name,
         rarity: won.rarity,
         itemType: won.item_type,
@@ -117,7 +119,26 @@ export async function POST(req: NextRequest) {
 
     await conn.commit();
 
-    return NextResponse.json({ ok: true, caseName: caseRows[0].case_name, opened: results.length, results });
+    // Full droppable pool (weight > 0) so the client can build the reel strips.
+    const totalWeight = lootItems.reduce((sum, i) => sum + i.weight, 0);
+    const items = lootItems.map((i) => ({
+      id: i.id,
+      name: i.name,
+      rarity: i.rarity,
+      itemType: i.item_type,
+      imageUrl: i.image_url,
+      isUnique: i.is_unique,
+      weight: i.weight,
+      chance: totalWeight > 0 ? i.weight / totalWeight : 0,
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      caseName: caseRows[0].case_name,
+      opened: results.length,
+      results,
+      items,
+    });
   } catch (err) {
     await conn.rollback();
     throw err;

@@ -15,6 +15,7 @@ import ItemIcon from "@/components/cases/ItemIcon";
 import type { CaseHistoryEntry, CaseReward, InventoryCase } from "@/components/cases/types";
 
 const HISTORY_PAGE_SIZE = 10;
+const MAX_BULK = 8;
 
 export default function Inventory() {
   const [unopened, setUnopened] = useState<InventoryCase[]>([]);
@@ -127,7 +128,8 @@ export default function Inventory() {
               {unopened.map((c) => {
                 const meta = GAME_MODE_MAP[c.gameMode];
                 const key = `${c.caseId}-${c.gameMode}`;
-                const bulkCount = Math.min(c.count, Math.max(2, bulkCounts[key] ?? c.count));
+                const maxBulk = Math.min(c.count, MAX_BULK);
+                const bulkCount = Math.min(maxBulk, Math.max(2, bulkCounts[key] ?? maxBulk));
                 return (
                   <div
                     key={key}
@@ -162,10 +164,13 @@ export default function Inventory() {
                         <input
                           type="number"
                           min={2}
-                          max={c.count}
+                          max={maxBulk}
                           value={bulkCount}
                           onChange={(e) =>
-                            setBulkCounts((prev) => ({ ...prev, [key]: Number(e.target.value) || 2 }))
+                            setBulkCounts((prev) => ({
+                              ...prev,
+                              [key]: Math.min(maxBulk, Math.max(2, Number(e.target.value) || 2)),
+                            }))
                           }
                           className="w-16 border border-white/15 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/50"
                         />
