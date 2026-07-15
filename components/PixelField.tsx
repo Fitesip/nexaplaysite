@@ -112,6 +112,9 @@ type Pixel = {
   size: number;
   vxBase: number;
   vyBase: number;
+  /** fixed spot (0..1) inside the theme's hue range; gives spatial color variety
+   *  without the pixel racing through the whole palette over time */
+  hueOffset: number;
   huePhase: number;
   hueSpeedBase: number;
   lightPhase: number;
@@ -126,6 +129,9 @@ type Pixel = {
  * which read as pixels "frantically" flickering through colors on a mode switch.
  */
 const EASE = 0.013;
+
+/** How many degrees a pixel's hue drifts around its fixed offset — small, just for life. */
+const HUE_SHIMMER_DEG = 7;
 
 function cloneTheme(t: Theme): Theme {
   return {
@@ -193,6 +199,7 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         size: 6 + Math.random() * 22,
         vxBase: (Math.random() - 0.5) * 0.15,
         vyBase: (Math.random() - 0.5) * 0.15,
+        hueOffset: Math.random(),
         huePhase: Math.random() * Math.PI * 2,
         hueSpeedBase: 0.0006 + Math.random() * 0.001,
         lightPhase: Math.random() * Math.PI * 2,
@@ -252,11 +259,14 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         if (p.y > height + 30) p.y = -30;
 
         const shimmer = 0.35 + 0.25 * Math.sin(t * p.speedBase * cur.pulseSpeedMul + p.phase);
-        const hueMix = 0.5 + 0.5 * Math.sin(t * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
-        const hue = cur.hueA + cur.hueSpan * hueMix;
+        // Pixel sits at its fixed offset in the range and only drifts a few degrees, so it
+        // never sweeps the whole palette (that read as "frantic" cycling on wide-range themes).
+        const hueShimmer =
+          HUE_SHIMMER_DEG * Math.sin(t * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
+        const hue = cur.hueA + cur.hueSpan * p.hueOffset + hueShimmer;
         const lightMix = 0.5 + 0.5 * Math.sin(t * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
-        const sat = cur.satMin + (cur.satMax - cur.satMin) * hueMix;
+        const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
 
         ctx!.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${shimmer})`;
         ctx!.shadowColor = `hsla(${hue}, ${sat}%, ${Math.min(light + 10, 90)}%, 0.8)`;
