@@ -42,7 +42,11 @@ export default function FAQ() {
         {FAQS.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="glass-panel pixel-corner overflow-hidden">
+            <div
+              key={item.q}
+              className="section-enter glass-panel pixel-corner overflow-hidden"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <button
                 onClick={() => setOpen(isOpen ? null : i)}
                 className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"

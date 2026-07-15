@@ -140,10 +140,10 @@ export default function CaseLootEditor({
         name: r.name.trim(),
         rarity: r.rarity,
         itemType: r.itemType,
-          isUnique: isAlwaysUniqueItemType(r.itemType) || r.isUnique,
-          imageUrl: r.imageUrl,
-          price: Number(r.price),
-          weight: Number(r.weight),
+        isUnique: isAlwaysUniqueItemType(r.itemType) || r.isUnique,
+        imageUrl: r.imageUrl,
+        price: Number(r.price),
+        weight: Number(r.weight),
       }))
       .filter((r) => r.name.length > 0);
 
@@ -216,8 +216,9 @@ export default function CaseLootEditor({
                       className="flex flex-col gap-2 border border-white/10 p-2.5"
                       style={{ borderLeft: `2px solid ${meta.color}` }}
                     >
-                      <div className="flex items-center gap-2">
-                        <label className="cursor-pointer" title="Загрузить иконку">
+                      <div className="flex items-end gap-2">
+                        <label className="flex cursor-pointer flex-col gap-1" title="Загрузить иконку">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Иконка</span>
                           <ItemIcon imageUrl={row.imageUrl} itemType={row.itemType} rarity={row.rarity} size={40} />
                           <input
                             type="file"
@@ -230,12 +231,15 @@ export default function CaseLootEditor({
                             }}
                           />
                         </label>
-                        <input
-                          value={row.name}
-                          onChange={(e) => update(idx, { name: e.target.value })}
-                          placeholder="Название предмета"
-                          className="min-w-0 flex-1 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                        />
+                        <label className="flex min-w-0 flex-1 flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Название</span>
+                          <input
+                            value={row.name}
+                            onChange={(e) => update(idx, { name: e.target.value })}
+                            placeholder="Название предмета"
+                            className="min-w-0 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                          />
+                        </label>
                         <button
                           onClick={() => removeRow(idx)}
                           aria-label="Удалить предмет"
@@ -247,51 +251,65 @@ export default function CaseLootEditor({
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={row.rarity}
-                          onChange={(e) => changeRarity(idx, e.target.value as Rarity)}
-                          className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                        >
-                          {RARITIES.map((r) => (
-                            <option key={r} value={r} className="bg-[#0a0a12]">
-                              {RARITY_MAP[r].label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={row.itemType}
-                          onChange={(e) => changeItemType(idx, e.target.value as ItemType)}
-                          title="Тип дропа"
-                          className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                        >
-                          {ITEM_TYPES.map((t) => (
-                            <option key={t} value={t} className="bg-[#0a0a12]">
-                              {ITEM_TYPE_MAP[t].label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          min={1}
-                          value={row.weight}
-                          onChange={(e) => update(idx, { weight: e.target.value })}
-                          title="Вес (шанс)"
-                          className="w-20 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          value={row.price}
-                          onChange={(e) => update(idx, { price: e.target.value })}
-                          title="Стоимость в игровой валюте"
-                          className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                        />
-                        <span
-                          className="w-14 text-right font-[var(--font-mono)] text-xs"
-                          style={{ color: meta.color }}
-                        >
-                          {chance.toFixed(chance < 0.01 && chance > 0 ? 2 : 1)}%
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Редкость</span>
+                          <select
+                            value={row.rarity}
+                            onChange={(e) => changeRarity(idx, e.target.value as Rarity)}
+                            className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                          >
+                            {RARITIES.map((r) => (
+                              <option key={r} value={r} className="bg-[#0a0a12]">
+                                {RARITY_MAP[r].label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Тип</span>
+                          <select
+                            value={row.itemType}
+                            onChange={(e) => changeItemType(idx, e.target.value as ItemType)}
+                            className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                          >
+                            {ITEM_TYPES.map((t) => (
+                              <option key={t} value={t} className="bg-[#0a0a12]">
+                                {ITEM_TYPE_MAP[t].label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Вес</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={row.weight}
+                            onChange={(e) => update(idx, { weight: e.target.value })}
+                            className="w-20 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">
+                            Цена, монеты
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.price}
+                            onChange={(e) => update(idx, { price: e.target.value })}
+                            className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                          />
+                        </label>
+                        <span className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Шанс</span>
+                          <span
+                            className="w-14 py-1.5 text-right font-[var(--font-mono)] text-xs"
+                            style={{ color: meta.color }}
+                          >
+                            {chance.toFixed(chance < 0.01 && chance > 0 ? 2 : 1)}%
+                          </span>
                         </span>
                         {isAlwaysUniqueItemType(row.itemType) ? (
                           <span className="ml-auto font-[var(--font-mono)] text-xs text-cyan-300">

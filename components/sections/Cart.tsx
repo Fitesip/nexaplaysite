@@ -40,6 +40,15 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
       ),
     [items]
   );
+  const itemAnimationIndex = useMemo(
+    () =>
+      new Map(
+        groupedByMode
+          .flatMap((group) => group.items)
+          .map((item, index) => [item.id, index])
+      ),
+    [groupedByMode]
+  );
 
   const validateAgainstServer = async (code: string, currentSubtotal: number) => {
     const res = await fetch("/api/promocodes/validate", {
@@ -195,8 +204,11 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
                   {group.items.map((item) => (
                     <div
                       key={item.id}
-                      className="glass-panel pixel-corner flex items-center gap-4 border-l-2 p-4"
-                      style={{ borderLeftColor: group.meta.accent }}
+                      className="section-enter glass-panel pixel-corner flex items-center gap-4 border-l-2 p-4"
+                      style={{
+                        borderLeftColor: group.meta.accent,
+                        animationDelay: `${(itemAnimationIndex.get(item.id) ?? 0) * 60}ms`,
+                      }}
                     >
                       <div className="min-w-0 flex-1">
                         <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-cyan-300/80">

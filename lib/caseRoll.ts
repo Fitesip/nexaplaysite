@@ -7,7 +7,7 @@ import { RARITY_RANK, RARITY_MAP, type Rarity } from "./rarity";
 
 export type RollItem = {
   id: number;
-  ownership_id?: number;
+  ownership_id?: string | number;
   rarity: Rarity;
   weight: number;
   is_unique?: boolean;
@@ -40,9 +40,9 @@ export function weightedPick<T extends { weight: number }>(
  * осталось ни одного предмета (все оставшиеся — уже полученные уникальные),
  * возвращает исходный список, чтобы кейс всё равно можно было открыть.
  */
-export function eligibleItems<T extends { id: number; ownership_id?: number; is_unique?: boolean }>(
+export function eligibleItems<T extends { id: number; ownership_id?: string | number; is_unique?: boolean }>(
   items: readonly T[],
-  ownedUniqueIds: ReadonlySet<number>
+  ownedUniqueIds: ReadonlySet<string | number>
 ): T[] {
   const eligible = items.filter((i) => !(i.is_unique && ownedUniqueIds.has(i.ownership_id ?? i.id)));
   return eligible.length > 0 ? eligible : [...items];

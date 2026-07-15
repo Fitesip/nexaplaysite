@@ -22,12 +22,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const pool = getPool();
   const [rows]: any = await pool.query(
-    `SELECT ci.id, ci.name, ci.rarity, ci.item_type, ci.is_unique, ci.image_url,
-            ci.weight, ci.sort_order, ip.price_currency
-     FROM case_items ci
-     JOIN item_prices ip ON ip.id = ci.item_price_id
-     WHERE ci.case_id = ?
-     ORDER BY ci.sort_order ASC, ci.id ASC`,
+    `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency, weight, sort_order
+     FROM case_items
+     WHERE case_id = ?
+     ORDER BY sort_order ASC, id ASC`,
     [caseId]
   );
   const totalWeight = rows.reduce((sum: number, r: any) => sum + Math.max(0, r.weight), 0);
@@ -103,26 +101,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await conn.query(`DELETE FROM case_items WHERE case_id = ?`, [caseId]);
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      const [priceResult]: any = await conn.query(
-        `INSERT INTO item_prices (name, item_type, price_currency)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           price_currency = VALUES(price_currency),
-           id = LAST_INSERT_ID(id)`,
-        [it.name, it.itemType, it.price]
-      );
       await conn.query(
         `INSERT INTO case_items
-           (case_id, item_price_id, name, rarity, item_type, is_unique, image_url, weight, sort_order)
+           (case_id, name, rarity, item_type, is_unique, image_url, price_currency, weight, sort_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           caseId,
-          priceResult.insertId,
           it.name,
           it.rarity,
           it.itemType,
           it.isUnique ? 1 : 0,
           it.imageUrl ?? null,
+          it.price,
           it.weight,
           i,
         ]

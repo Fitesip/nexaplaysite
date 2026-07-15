@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
 import { caseOpenError, eligibleItems, weightedPick } from "@/lib/caseRoll";
+import { itemOwnershipKey } from "@/lib/itemType";
 
 const schema = z.object({
   userCaseId: z.union([z.string(), z.number()]),
@@ -48,17 +49,15 @@ export async function POST(req: NextRequest) {
     }
 
     const [pool_]: any = await conn.query(
-      `SELECT ci.id, ci.item_price_id, ci.name, ci.rarity, ci.item_type, ci.is_unique,
-              ci.image_url, ci.weight, ip.price_currency
-       FROM case_items ci
-       JOIN item_prices ip ON ip.id = ci.item_price_id
-       WHERE ci.case_id = ?
-       ORDER BY ci.sort_order ASC, ci.id ASC`,
+      `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency, weight
+       FROM case_items
+       WHERE case_id = ?
+       ORDER BY sort_order ASC, id ASC`,
       [owned.case_id]
     );
     const lootItems: {
       id: number;
-      ownership_id: number;
+      ownership_id: string;
       name: string;
       rarity: string;
       item_type: string;
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
       .filter((r: any) => r.weight > 0)
       .map((r: any) => ({
         id: r.id,
-        ownership_id: r.item_price_id,
+        ownership_id: itemOwnershipKey(r.item_type, r.name),
         name: r.name,
         rarity: r.rarity,
         item_type: r.item_type,
@@ -84,13 +83,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Кейс пуст — обратитесь к администрации" }, { status: 409 });
     }
 
-    // Unique rewards the user has already won from this case are excluded from the roll.
+    // Unique rewards the user has already won are excluded from the roll.
     const [ownedRows]: any = await conn.query(
-      `SELECT DISTINCT won_item_price_id AS id FROM user_cases
-       WHERE user_id = ? AND status = 'opened' AND won_item_price_id IS NOT NULL`,
+      `SELECT DISTINCT won_item_name, won_item_type FROM user_cases
+       WHERE user_id = ? AND status = 'opened' AND won_item_name IS NOT NULL`,
       [userId]
     );
-    const ownedUniqueIds = new Set<number>(ownedRows.map((r: any) => Number(r.id)));
+    const ownedUniqueIds = new Set<string>(
+      ownedRows.map((r: any) => itemOwnershipKey(r.won_item_type ?? "item", r.won_item_name))
+    );
 
     const candidates = eligibleItems(lootItems, ownedUniqueIds);
     const won = weightedPick(candidates) ?? candidates[candidates.length - 1];
@@ -106,14 +107,13 @@ export async function POST(req: NextRequest) {
 
     await conn.query(
       `UPDATE user_cases
-       SET status = 'opened', won_case_item_id = ?, won_item_price_id = ?, won_item_name = ?,
-           won_item_rarity = ?, won_item_type = ?, won_item_image = ?, compensation_amount = ?,
+       SET status = 'opened', won_case_item_id = ?, won_item_name = ?, won_item_rarity = ?,
+           won_item_type = ?, won_item_image = ?, compensation_amount = ?,
            compensated = ?, claimed = ?, claimed_at = CASE WHEN ? = 1 THEN NOW() ELSE NULL END,
            opened_at = NOW()
        WHERE id = ?`,
       [
         won.id,
-        won.ownership_id,
         won.name,
         won.rarity,
         won.item_type,
