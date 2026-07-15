@@ -11,8 +11,11 @@ export type PixelThemeName = "default" | GameMode;
  */
 type Theme = {
   bg: [number, number, number];
+  /** starting hue of the per-pixel range */
   hueA: number;
-  hueB: number;
+  /** signed width of the hue range (hue = hueA + hueSpan * mix); kept as one linear
+   *  value so morphing never distorts the range the way interpolating two angles would */
+  hueSpan: number;
   satMin: number;
   satMax: number;
   lightMin: number;
@@ -34,7 +37,7 @@ const THEMES: Record<PixelThemeName, Theme> = {
   default: {
     bg: [5, 3, 8],
     hueA: 275,
-    hueB: 190,
+    hueSpan: -85,
     satMin: 80,
     satMax: 90,
     lightMin: 55,
@@ -48,7 +51,7 @@ const THEMES: Record<PixelThemeName, Theme> = {
   terryx: {
     bg: [5, 3, 8],
     hueA: 275,
-    hueB: 190,
+    hueSpan: -85,
     satMin: 80,
     satMax: 90,
     lightMin: 55,
@@ -62,7 +65,7 @@ const THEMES: Record<PixelThemeName, Theme> = {
   bloodborne: {
     bg: [10, 2, 2],
     hueA: 0,
-    hueB: 355,
+    hueSpan: 355,
     satMin: 70,
     satMax: 95,
     lightMin: 22,
@@ -76,7 +79,7 @@ const THEMES: Record<PixelThemeName, Theme> = {
   heaven: {
     bg: [12, 16, 6],
     hueA: 85,
-    hueB: 95,
+    hueSpan: 10,
     satMin: 15,
     satMax: 55,
     lightMin: 55,
@@ -90,7 +93,7 @@ const THEMES: Record<PixelThemeName, Theme> = {
   games: {
     bg: [5, 10, 13],
     hueA: 50,
-    hueB: 190,
+    hueSpan: 140,
     satMin: 75,
     satMax: 95,
     lightMin: 55,
@@ -124,7 +127,7 @@ function cloneTheme(t: Theme): Theme {
   return {
     bg: [...t.bg] as [number, number, number],
     hueA: t.hueA,
-    hueB: t.hueB,
+    hueSpan: t.hueSpan,
     satMin: t.satMin,
     satMax: t.satMax,
     lightMin: t.lightMin,
@@ -204,7 +207,7 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
     function easeTowardTarget() {
       const tg = targetRef.current;
       cur.hueA = lerpAngle(cur.hueA, tg.hueA, EASE);
-      cur.hueB = lerpAngle(cur.hueB, tg.hueB, EASE);
+      cur.hueSpan = lerp(cur.hueSpan, tg.hueSpan, EASE);
       cur.satMin = lerp(cur.satMin, tg.satMin, EASE);
       cur.satMax = lerp(cur.satMax, tg.satMax, EASE);
       cur.lightMin = lerp(cur.lightMin, tg.lightMin, EASE);
@@ -246,7 +249,7 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
 
         const shimmer = 0.35 + 0.25 * Math.sin(t * p.speedBase * cur.pulseSpeedMul + p.phase);
         const hueMix = 0.5 + 0.5 * Math.sin(t * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
-        const hue = cur.hueA + (cur.hueB - cur.hueA) * hueMix;
+        const hue = cur.hueA + cur.hueSpan * hueMix;
         const lightMix = 0.5 + 0.5 * Math.sin(t * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * hueMix;
