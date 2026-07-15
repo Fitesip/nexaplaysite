@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRconAccess } from "@/lib/auth";
-import { sendRconCommand } from "@/lib/rcon";
+import { checkRconConnection, sendRconCommand } from "@/lib/rcon";
 import { ampersandToSectionSign } from "@/lib/minecraft-colors";
 import { appendRconLog } from "@/lib/rcon-log";
 
@@ -14,9 +14,10 @@ export async function GET() {
     return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
   }
 
-  return NextResponse.json({
-    configured: Boolean(process.env.RCON_HOST && process.env.RCON_PASSWORD),
-  });
+  const configured = Boolean(process.env.RCON_HOST && process.env.RCON_PASSWORD);
+  const connected = configured ? await checkRconConnection() : false;
+
+  return NextResponse.json({ configured, connected });
 }
 
 export async function POST(req: NextRequest) {
