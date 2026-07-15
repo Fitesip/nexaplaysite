@@ -16,7 +16,6 @@ type View = { type: "list" } | { type: "new" } | { type: "thread"; id: number };
 
 export default function SupportChat() {
   const { subscribe } = useSocket();
-  const [collapsed, setCollapsed] = useState(true); // always starts collapsed
   const [view, setView] = useState<View>({ type: "list" });
   const [hasNewReply, setHasNewReply] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
@@ -38,21 +37,9 @@ export default function SupportChat() {
   // an admin reply on any ticket lights up the badge immediately
   useEffect(() => subscribe("support:admin_message", () => setHasNewReply(true)), [subscribe]);
 
-  const toggleOpen = () => {
-    setCollapsed((c) => !c);
-    if (collapsed) {
-      setHasNewReply(false);
-      setView({ type: "list" });
-      setRefreshSignal((s) => s + 1);
-    }
-  };
-
   return (
     <div className="glass-panel pixel-corner mt-6 overflow-hidden">
-      <button
-        onClick={toggleOpen}
-        className="flex w-full items-center justify-between gap-3 p-6 text-left transition-colors duration-200 hover:bg-white/[0.03]"
-      >
+      <div className="flex w-full items-center gap-3 p-6 pb-0 text-left">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-60" />
@@ -65,46 +52,38 @@ export default function SupportChat() {
             </span>
           )}
         </div>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={`h-4 w-4 shrink-0 text-[var(--color-mist)] transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`}
-        >
-          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      </div>
 
-      {!collapsed && (
-        <div className="section-enter px-6 pb-6">
-          {view.type === "list" && (
-            <TicketList
-              refreshSignal={refreshSignal}
-              onOpenTicket={(id) => setView({ type: "thread", id })}
-              onNewTicket={() => setView({ type: "new" })}
-            />
-          )}
-          {view.type === "new" && (
-            <NewTicketForm
-              onCancel={() => setView({ type: "list" })}
-              onCreated={(id) => {
-                setRefreshSignal((s) => s + 1);
-                setView({ type: "thread", id });
-              }}
-            />
-          )}
-          {view.type === "thread" && (
-            <TicketThread
-              ticketId={view.id}
-              onBack={() => {
-                setRefreshSignal((s) => s + 1);
-                setView({ type: "list" });
-              }}
-            />
-          )}
-        </div>
-      )}
+      <div className="section-enter px-6 pb-6">
+        {view.type === "list" && (
+          <TicketList
+            refreshSignal={refreshSignal}
+            onOpenTicket={(id) => {
+              setHasNewReply(false);
+              setView({ type: "thread", id });
+            }}
+            onNewTicket={() => setView({ type: "new" })}
+          />
+        )}
+        {view.type === "new" && (
+          <NewTicketForm
+            onCancel={() => setView({ type: "list" })}
+            onCreated={(id) => {
+              setRefreshSignal((s) => s + 1);
+              setView({ type: "thread", id });
+            }}
+          />
+        )}
+        {view.type === "thread" && (
+          <TicketThread
+            ticketId={view.id}
+            onBack={() => {
+              setRefreshSignal((s) => s + 1);
+              setView({ type: "list" });
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

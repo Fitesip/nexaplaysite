@@ -127,7 +127,14 @@ export default function Profile({
                   : "text-[var(--color-mist)] hover:text-white"
               }`}
             >
-              {t.label}
+              <span className="flex items-center gap-2">
+                {t.label}
+                {t.id === "minecraft" && !user.minecraft_username && (
+                  <span className="flex h-5 w-5 items-center justify-center border border-rose-400/40 font-[var(--font-display)] text-[10px] font-bold text-rose-300">
+                    !
+                  </span>
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -247,7 +254,7 @@ export default function Profile({
         </p>
 
         <div className="mt-6 grid grid-cols-3 gap-3 text-left">
-          <StatCard label="Донат-баланс" value="0 ₽" />
+          <StatCard label="Игровая валюта" value={`${user.game_currency.toLocaleString("ru-RU")} монет`} />
           <StatCard label="Заявок в поддержку" value="0" />
           <StatCard label="Статус" value={ROLE_LABEL[user.role]} />
         </div>

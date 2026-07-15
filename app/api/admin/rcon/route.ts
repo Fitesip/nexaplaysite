@@ -1,7 +1,7 @@
 /** POST /api/admin/rcon — runs a raw command on the game server via RCON. Staff only. */
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireStaff } from "@/lib/auth";
+import { requireRconAccess } from "@/lib/auth";
 import { sendRconCommand } from "@/lib/rcon";
 import { ampersandToSectionSign } from "@/lib/minecraft-colors";
 import { appendRconLog } from "@/lib/rcon-log";
@@ -9,7 +9,7 @@ import { appendRconLog } from "@/lib/rcon-log";
 const schema = z.object({ command: z.string().trim().min(1).max(500) });
 
 export async function GET() {
-  const staff = await requireStaff();
+  const staff = await requireRconAccess();
   if (!staff) {
     return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
   }
@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const staff = await requireStaff();
+  const staff = await requireRconAccess();
   if (!staff) {
     return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
   }

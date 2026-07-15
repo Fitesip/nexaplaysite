@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { formatUntil } from "./formatUntil";
 import ActionButton from "./ActionButton";
 
-type Role = "user" | "helper" | "admin" | "main_admin";
+type Role = "user" | "rcon" | "helper" | "admin" | "main_admin";
 type AdminUser = {
   id: number;
   username: string;
@@ -25,6 +25,7 @@ type BanKind = "site" | "forum";
 
 const ROLE_LABEL: Record<Role, string> = {
   user: "Странник",
+  rcon: "RCON",
   helper: "Хелпер",
   admin: "Администратор",
   main_admin: "Главный админ",
@@ -32,6 +33,7 @@ const ROLE_LABEL: Record<Role, string> = {
 
 const ROLE_BADGE: Record<Role, string> = {
   user: "border-white/15 text-[var(--color-mist)]",
+  rcon: "border-emerald-400/40 text-emerald-300",
   helper: "border-cyan-400/40 text-cyan-300",
   admin: "border-violet-400/40 text-violet-300",
   main_admin: "border-amber-400/50 text-amber-300",
@@ -68,9 +70,10 @@ export default function AdminUsers({ myRole, myId }: { myRole: Role; myId: numbe
     load();
   }, []);
 
-  const assignableRoles: Role[] = myRole === "main_admin" ? ["user", "helper", "admin"] : ["user", "helper"];
+  const assignableRoles: Role[] =
+    myRole === "main_admin" ? ["user", "rcon", "helper", "admin"] : ["user", "rcon", "helper"];
 
-  const rank = (r: Role) => ({ user: 0, helper: 1, admin: 2, main_admin: 3 }[r]);
+  const rank = (r: Role) => ({ user: 0, rcon: 1, helper: 2, admin: 3, main_admin: 4 }[r]);
   const canAct = (target: AdminUser) => target.id !== myId && rank(myRole) > rank(target.role);
 
   const patch = async (id: number, payload: Record<string, unknown>) => {

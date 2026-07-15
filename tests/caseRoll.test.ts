@@ -56,9 +56,9 @@ describe("weightedPick", () => {
 
 describe("eligibleItems (unique-reward exclusion)", () => {
   const pool = [
-    { id: 1, is_unique: false },
-    { id: 2, is_unique: true },
-    { id: 3, is_unique: true },
+    { id: 1, ownership_id: 1, is_unique: false },
+    { id: 2, ownership_id: 2, is_unique: true },
+    { id: 3, ownership_id: 3, is_unique: true },
   ];
 
   it("excludes unique items the user already owns", () => {
@@ -73,8 +73,8 @@ describe("eligibleItems (unique-reward exclusion)", () => {
 
   it("falls back to the full pool when every item is an already-owned unique", () => {
     const onlyUnique = [
-      { id: 2, is_unique: true },
-      { id: 3, is_unique: true },
+      { id: 2, ownership_id: 2, is_unique: true },
+      { id: 3, ownership_id: 3, is_unique: true },
     ];
     const eligible = eligibleItems(onlyUnique, new Set([2, 3]));
     expect(eligible.map((i) => i.id)).toEqual([2, 3]);
@@ -84,15 +84,15 @@ describe("eligibleItems (unique-reward exclusion)", () => {
     // Mirror the bulk-open loop: after winning a unique, add its id to the owned set so the
     // next draw excludes it (`?? last` mirrors the route's degenerate-pool fallback).
     const batchPool: RollItem[] = [
-      { id: 1, rarity: "common", weight: 5 },
-      { id: 2, rarity: "legendary", weight: 5, is_unique: true },
+      { id: 1, ownership_id: 1, rarity: "common", weight: 5 },
+      { id: 2, ownership_id: 2, rarity: "legendary", weight: 5, is_unique: true },
     ];
     const owned = new Set<number>();
     const wins: number[] = [];
     for (let i = 0; i < 10; i++) {
       const candidates = eligibleItems(batchPool, owned);
       const won = weightedPick(candidates) ?? candidates[candidates.length - 1];
-      if (won.is_unique) owned.add(won.id);
+      if (won.is_unique) owned.add(won.ownership_id ?? won.id);
       wins.push(won.id);
     }
     expect(wins.filter((id) => id === 2).length).toBeLessThanOrEqual(1);

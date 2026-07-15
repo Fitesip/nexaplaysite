@@ -344,6 +344,11 @@ export default function Inventory() {
                             <span className="text-white" style={{ color: meta?.color }}>
                               {h.won_item_name ?? "—"}
                             </span>
+                            {h.compensated && (
+                              <span className="ml-2 text-amber-300">
+                                (компенсация {Number(h.compensation_amount).toLocaleString("ru-RU")} монет)
+                              </span>
+                            )}
                           </span>
                         </span>
                         <span className="shrink-0 font-[var(--font-mono)] text-[11px] text-[var(--color-mist)]/70">

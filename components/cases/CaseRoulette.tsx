@@ -12,11 +12,14 @@ import { RARITY_MAP, sortByRarity, type Rarity } from "@/lib/rarity";
 import { ITEM_TYPE_MAP, type ItemType } from "@/lib/itemType";
 import ItemIcon from "./ItemIcon";
 import type { CaseLootItem } from "./types";
+import { useAuth } from "@/lib/auth-context";
 
 type OpenResult = {
   won: { id: number; name: string; rarity: Rarity; itemType: ItemType; imageUrl: string | null };
   items: CaseLootItem[];
   caseName: string;
+  compensated: boolean;
+  compensationAmount: number;
 };
 
 // Tile geometry (px). Kept in JS so the landing offset can be computed exactly.
@@ -41,6 +44,7 @@ export default function CaseRoulette({
   onClose: () => void;
   onOpened: () => void;
 }) {
+  const { user, setUser } = useAuth();
   const [phase, setPhase] = useState<"loading" | "spinning" | "done" | "error">("loading");
   const [error, setError] = useState("");
   const [result, setResult] = useState<OpenResult | null>(null);
@@ -96,7 +100,16 @@ export default function CaseRoulette({
           chance: 0,
         };
 
-        setResult({ won, items: pool, caseName: data.caseName ?? caseName });
+        setResult({
+          won,
+          items: pool,
+          caseName: data.caseName ?? caseName,
+          compensated: Boolean(data.compensated),
+          compensationAmount: Number(data.compensationAmount ?? 0),
+        });
+        if (user) {
+          setUser({ ...user, game_currency: Number(data.balance ?? user.game_currency) });
+        }
         setReel(strip);
         setPhase("spinning");
       } catch (err) {
@@ -104,7 +117,7 @@ export default function CaseRoulette({
         setPhase("error");
       }
     })();
-  }, [userCaseId, caseName]);
+  }, [userCaseId, caseName, user, setUser]);
 
   // Measure the viewport so we can centre the winning tile under the marker.
   useEffect(() => {
@@ -261,13 +274,22 @@ export default function CaseRoulette({
                       </span>
                     )}
                   </span>
+                  {result.compensated && (
+                    <p className="mx-auto mt-4 max-w-md border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                      Этот уникальный предмет уже есть у вас. Начислена компенсация:{" "}
+                      <span className="font-semibold text-white">
+                        {result.compensationAmount.toLocaleString("ru-RU")} монет
+                      </span>
+                      .
+                    </p>
+                  )}
                 </div>
                 <div className="mt-6 flex justify-center">
                   <button
                     onClick={onClose}
                     className="pixel-corner bg-gradient-to-r from-violet-600 to-cyan-500 px-8 py-2.5 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.02]"
                   >
-                    Забрать
+                    {result.compensated ? "Закрыть" : "Забрать"}
                   </button>
                 </div>
               </div>

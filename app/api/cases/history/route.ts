@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const [rows]: any = await pool.query(
     `SELECT id, case_id, case_name, game_mode, won_item_name, won_item_rarity,
-            won_item_type, won_item_image, opened_at
+            won_item_type, won_item_image, compensated, compensation_amount, opened_at
      FROM user_cases
      WHERE ${whereSql}
      ORDER BY opened_at DESC
