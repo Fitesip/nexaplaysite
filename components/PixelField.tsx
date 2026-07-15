@@ -143,6 +143,7 @@ function smooth(x: number): number {
 
 /** How many degrees a pixel's hue drifts around its fixed offset — small, just for life. */
 const HUE_SHIMMER_DEG = 7;
+const TWO_PI = Math.PI * 2;
 
 function cloneTheme(t: Theme): Theme {
   return {
@@ -258,15 +259,12 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         `linear-gradient(90deg, rgba(${br | 0},${bg | 0},${bb | 0},${ba.toFixed(3)}) 1px, transparent 1px)`;
     }
 
-    // Own accumulated clock (ms). Delta is clamped so a throttled/backgrounded tab can't inject
-    // a huge time jump on return — that burst is what made colors race after switching tabs.
-    let clock = 0;
+    // Delta is clamped so a throttled/backgrounded tab can't inject a huge time jump on return.
     let lastNow = performance.now();
 
     function draw(now: number) {
       const dt = Math.min(50, Math.max(0, now - lastNow));
       lastNow = now;
-      clock += dt;
       easeTowardTarget(1 - Math.exp(-dt / EASE_TAU));
 
       // On a theme change, freeze each pixel's currently-shown hue as its crossfade start,
@@ -297,14 +295,18 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         if (p.y < -30) p.y = height + 30;
         if (p.y > height + 30) p.y = -30;
 
-        const shimmer = 0.35 + 0.25 * Math.sin(clock * p.speedBase * cur.pulseSpeedMul + p.phase);
+        // Delta-time integration keeps each phase continuous while pulse speed is interpolated.
+        p.phase = (p.phase + dt * p.speedBase * cur.pulseSpeedMul) % TWO_PI;
+        p.huePhase = (p.huePhase + dt * p.hueSpeedBase * cur.pulseSpeedMul) % TWO_PI;
+        p.lightPhase = (p.lightPhase + dt * p.lightSpeedBase * cur.pulseSpeedMul) % TWO_PI;
+
+        const shimmer = 0.35 + 0.25 * Math.sin(p.phase);
         // Pixel sits at its fixed offset in the range and only drifts a few degrees, so it
         // never sweeps the whole palette (that read as "frantic" cycling on wide-range themes).
-        const hueShimmer =
-          HUE_SHIMMER_DEG * Math.sin(clock * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
+        const hueShimmer = HUE_SHIMMER_DEG * Math.sin(p.huePhase);
         const hueTarget = toA + toSpan * p.hueOffset;
         const hue = lerpAngle(p.hueFrom, hueTarget, hueEase) + hueShimmer;
-        const lightMix = 0.5 + 0.5 * Math.sin(clock * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
+        const lightMix = 0.5 + 0.5 * Math.sin(p.lightPhase);
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
 
