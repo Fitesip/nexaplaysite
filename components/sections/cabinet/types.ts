@@ -15,6 +15,7 @@ export type User = CurrentUser;
 /** Human-readable label for each account role, shown on the profile card. */
 export const ROLE_LABEL: Record<User["role"], string> = {
   user: "Странник",
+  rcon: "RCON",
   helper: "Хелпер",
   admin: "Администратор",
   main_admin: "Главный администратор",

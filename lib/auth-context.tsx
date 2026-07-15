@@ -8,7 +8,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 
-export type Role = "user" | "helper" | "admin" | "main_admin";
+export type Role = "user" | "rcon" | "helper" | "admin" | "main_admin";
 export type CurrentUser = {
   id: number;
   username: string;
@@ -18,6 +18,7 @@ export type CurrentUser = {
   minecraft_uuid: string | null;
   minecraft_linked_at: string | null;
   role: Role;
+  game_currency: number;
   forum_banned: boolean;
   forum_banned_until: string | null;
   created_at: string;

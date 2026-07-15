@@ -10,6 +10,7 @@ import { ITEM_TYPE_MAP } from "@/lib/itemType";
 import ItemIcon from "./ItemIcon";
 import CaseReel from "./CaseReel";
 import type { BulkOpenResult, CaseLootItem } from "./types";
+import { useAuth } from "@/lib/auth-context";
 
 export default function CaseBulkResult({
   caseId,
@@ -24,6 +25,7 @@ export default function CaseBulkResult({
   onClose: () => void;
   onOpened: () => void;
 }) {
+  const { user, setUser } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<"loading" | "spinning" | "error">("loading");
   const [error, setError] = useState("");
@@ -57,6 +59,9 @@ export default function CaseBulkResult({
         }
         setResults(data.results ?? []);
         setPool(data.items ?? []);
+        if (user) {
+          setUser({ ...user, game_currency: Number(data.balance ?? user.game_currency) });
+        }
         setPhase("spinning");
         onOpened();
       } catch {
@@ -64,7 +69,7 @@ export default function CaseBulkResult({
         setPhase("error");
       }
     })();
-  }, [caseId, count, onOpened]);
+  }, [caseId, count, onOpened, user, setUser]);
 
   const allSettled = results.length > 0 && settledCount >= results.length;
   const summary = useMemo(() => sortByRarity(results), [results]);
@@ -161,6 +166,11 @@ export default function CaseBulkResult({
                           <span className="font-[var(--font-mono)] text-[9px] text-[var(--color-mist)]">
                             {ITEM_TYPE_MAP[r.itemType].label}
                           </span>
+                          {r.compensated && (
+                            <span className="font-[var(--font-mono)] text-[9px] text-amber-300">
+                              Компенсация: {r.compensationAmount.toLocaleString("ru-RU")} монет
+                            </span>
+                          )}
                         </div>
                       );
                     })}

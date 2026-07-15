@@ -1,4 +1,4 @@
-/** Staff-only shortcut to the admin/helper panel, with an unread-support-chat badge. */
+/** Staff-only shortcut to the role-appropriate management panel. */
 export default function AdminNavButton({
   active,
   role,
@@ -6,7 +6,7 @@ export default function AdminNavButton({
   onClick,
 }: {
   active: boolean;
-  role: "helper" | "admin" | "main_admin";
+  role: "rcon" | "helper" | "admin" | "main_admin";
   unreadCount: number;
   onClick: () => void;
 }) {
@@ -22,7 +22,9 @@ export default function AdminNavButton({
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
           <path d="M12 3l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3Z" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="hidden sm:inline">{role === "helper" ? "Хелпер-панель" : "Админ-панель"}</span>
+        <span className="hidden sm:inline">
+          {role === "rcon" ? "RCON" : role === "helper" ? "Хелпер-панель" : "Админ-панель"}
+        </span>
       </span>
       {unreadCount > 0 && (
         <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 px-1 font-[var(--font-mono)] text-[10px] font-bold text-white">

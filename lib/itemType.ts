@@ -15,6 +15,8 @@ export const ITEM_TYPES = [
 
 export type ItemType = (typeof ITEM_TYPES)[number];
 
+const ALWAYS_UNIQUE_ITEM_TYPES = new Set<ItemType>(["privilege", "cosmetic", "pet", "title"]);
+
 export type ItemTypeMeta = {
   id: ItemType;
   label: string;
@@ -34,4 +36,8 @@ export const ITEM_TYPE_MAP: Record<ItemType, ItemTypeMeta> = {
 
 export function isItemType(value: unknown): value is ItemType {
   return typeof value === "string" && (ITEM_TYPES as readonly string[]).includes(value);
+}
+
+export function isAlwaysUniqueItemType(itemType: ItemType): boolean {
+  return ALWAYS_UNIQUE_ITEM_TYPES.has(itemType);
 }

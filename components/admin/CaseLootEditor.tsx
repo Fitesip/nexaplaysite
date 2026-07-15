@@ -13,7 +13,7 @@ import {
   sortByRarity,
   type Rarity,
 } from "@/lib/rarity";
-import { ITEM_TYPES, ITEM_TYPE_MAP, type ItemType } from "@/lib/itemType";
+import { ITEM_TYPES, ITEM_TYPE_MAP, isAlwaysUniqueItemType, type ItemType } from "@/lib/itemType";
 import { rarityChanceWarning } from "@/lib/caseRoll";
 import ItemIcon from "@/components/cases/ItemIcon";
 
@@ -23,6 +23,7 @@ type Row = {
   itemType: ItemType;
   isUnique: boolean;
   imageUrl: string | null;
+  price: string;
   weight: string;
 };
 
@@ -32,6 +33,7 @@ type LoadedItem = {
   itemType?: ItemType;
   isUnique?: boolean;
   imageUrl?: string | null;
+  price?: number;
   weight: number;
 };
 
@@ -41,6 +43,7 @@ const emptyRow = (): Row => ({
   itemType: "item",
   isUnique: false,
   imageUrl: null,
+  price: "0",
   weight: String(DEFAULT_RARITY_WEIGHT.common),
 });
 
@@ -73,8 +76,9 @@ export default function CaseLootEditor({
                 name: i.name,
                 rarity: i.rarity,
                 itemType: i.itemType ?? "item",
-                isUnique: Boolean(i.isUnique),
+                isUnique: isAlwaysUniqueItemType(i.itemType ?? "item") || Boolean(i.isUnique),
                 imageUrl: i.imageUrl ?? null,
+                price: String(i.price ?? 0),
                 weight: String(i.weight),
               }))
             : [emptyRow()]
@@ -108,6 +112,8 @@ export default function CaseLootEditor({
   // rarer items get a lower drop chance by default (admins can still tweak it).
   const changeRarity = (idx: number, rarity: Rarity) =>
     update(idx, { rarity, weight: String(DEFAULT_RARITY_WEIGHT[rarity]) });
+  const changeItemType = (idx: number, itemType: ItemType) =>
+    update(idx, { itemType, isUnique: isAlwaysUniqueItemType(itemType) });
   const removeRow = (idx: number) => setRows((prev) => prev.filter((_, i) => i !== idx));
 
   const uploadIcon = async (idx: number, file: File) => {
@@ -134,15 +140,20 @@ export default function CaseLootEditor({
         name: r.name.trim(),
         rarity: r.rarity,
         itemType: r.itemType,
-        isUnique: r.isUnique,
-        imageUrl: r.imageUrl,
-        weight: Number(r.weight),
+          isUnique: isAlwaysUniqueItemType(r.itemType) || r.isUnique,
+          imageUrl: r.imageUrl,
+          price: Number(r.price),
+          weight: Number(r.weight),
       }))
       .filter((r) => r.name.length > 0);
 
     for (const it of items) {
       if (!Number.isInteger(it.weight) || it.weight <= 0) {
         setError(`Некорректный вес у предмета «${it.name || "без названия"}» (нужно целое > 0)`);
+        return;
+      }
+      if (!Number.isInteger(it.price) || it.price < 0) {
+        setError(`Некорректная стоимость у предмета «${it.name || "без названия"}» (нужно целое ≥ 0)`);
         return;
       }
     }
@@ -250,7 +261,7 @@ export default function CaseLootEditor({
                         </select>
                         <select
                           value={row.itemType}
-                          onChange={(e) => update(idx, { itemType: e.target.value as ItemType })}
+                          onChange={(e) => changeItemType(idx, e.target.value as ItemType)}
                           title="Тип дропа"
                           className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
                         >
@@ -268,21 +279,35 @@ export default function CaseLootEditor({
                           title="Вес (шанс)"
                           className="w-20 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
                         />
+                        <input
+                          type="number"
+                          min={0}
+                          value={row.price}
+                          onChange={(e) => update(idx, { price: e.target.value })}
+                          title="Стоимость в игровой валюте"
+                          className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                        />
                         <span
                           className="w-14 text-right font-[var(--font-mono)] text-xs"
                           style={{ color: meta.color }}
                         >
                           {chance.toFixed(chance < 0.01 && chance > 0 ? 2 : 1)}%
                         </span>
-                        <label className="ml-auto flex cursor-pointer items-center gap-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)]">
-                          <input
-                            type="checkbox"
-                            checked={row.isUnique}
-                            onChange={(e) => update(idx, { isUnique: e.target.checked })}
-                            className="accent-cyan-500"
-                          />
-                          уникальный
-                        </label>
+                        {isAlwaysUniqueItemType(row.itemType) ? (
+                          <span className="ml-auto font-[var(--font-mono)] text-xs text-cyan-300">
+                            уникальный
+                          </span>
+                        ) : (
+                          <label className="ml-auto flex cursor-pointer items-center gap-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)]">
+                            <input
+                              type="checkbox"
+                              checked={row.isUnique}
+                              onChange={(e) => update(idx, { isUnique: e.target.checked })}
+                              className="accent-cyan-500"
+                            />
+                            уникальный
+                          </label>
+                        )}
                         {uploadingIdx === idx && (
                           <span className="font-[var(--font-mono)] text-[10px] text-cyan-300">загрузка…</span>
                         )}

@@ -34,6 +34,8 @@ export type CaseHistoryEntry = {
   won_item_rarity: Rarity | null;
   won_item_type: ItemType | null;
   won_item_image: string | null;
+  compensated: boolean;
+  compensation_amount: number;
   opened_at: string;
 };
 
@@ -57,4 +59,6 @@ export type BulkOpenResult = {
   rarity: Rarity;
   itemType: ItemType;
   imageUrl: string | null;
+  compensated: boolean;
+  compensationAmount: number;
 };

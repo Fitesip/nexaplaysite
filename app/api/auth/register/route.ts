@@ -88,9 +88,12 @@ export async function POST(req: NextRequest) {
   }
 
   const [rows]: any = await pool.query(
-    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, created_at FROM users WHERE id = ?",
+    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, role, game_currency, created_at FROM users WHERE id = ?",
     [userId]
   );
 
-  return NextResponse.json({ user: rows[0] }, { status: 201 });
+  return NextResponse.json(
+    { user: { ...rows[0], game_currency: Number(rows[0].game_currency) } },
+    { status: 201 }
+  );
 }
