@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const pool = getPool();
   const [rows]: any = await pool.query(
-    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, password_hash, role, game_currency, banned, banned_reason, banned_until, created_at FROM users WHERE username = ? LIMIT 1",
+    "SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at, password_hash, role, game_currency, balance_kopecks, banned, banned_reason, banned_until, created_at FROM users WHERE username = ? LIMIT 1",
     [username]
   );
 
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       minecraft_linked_at: user.minecraft_linked_at,
       role: user.role,
       game_currency: Number(user.game_currency),
+      balance_kopecks: Number(user.balance_kopecks),
       created_at: user.created_at,
     },
   });

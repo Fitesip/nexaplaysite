@@ -12,7 +12,8 @@ export async function GET() {
   const pool = getPool();
   const [rows]: any = await pool.query(
     `SELECT id, username, email, avatar_url, minecraft_username, minecraft_uuid, minecraft_linked_at,
-            role, game_currency, banned, banned_until, forum_banned, forum_banned_reason, forum_banned_until, created_at
+            role, game_currency, balance_kopecks, banned, banned_until, forum_banned, forum_banned_reason,
+            forum_banned_until, created_at
      FROM users WHERE id = ?`,
     [userId]
   );
@@ -27,6 +28,7 @@ export async function GET() {
     user: {
       ...rest,
       game_currency: Number(row.game_currency),
+      balance_kopecks: Number(row.balance_kopecks),
       forum_banned: isBanActive(forum_banned, forum_banned_until),
       forum_banned_until: row.forum_banned_until,
     },

@@ -27,9 +27,14 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const skipNextRevalidate = useRef(false);
+  const checkoutRequestIdRef = useRef<string | null>(null);
 
   const discount = promo.status === "applied" ? promo.discountAmount : 0;
   const total = Math.max(0, subtotal - discount);
+
+  useEffect(() => {
+    checkoutRequestIdRef.current = null;
+  }, [items, promo]);
 
   // Group cart lines by game mode so items from different modes are visually
   // separated instead of being shown as one undifferentiated list.
@@ -115,6 +120,8 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
   const checkout = async () => {
     setCheckingOut(true);
     setCheckoutError("");
+    const requestId = checkoutRequestIdRef.current ?? crypto.randomUUID();
+    checkoutRequestIdRef.current = requestId;
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -122,6 +129,7 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.catalogId, qty: i.qty })),
           promoCode: promo.status === "applied" ? promo.code : undefined,
+          requestId,
         }),
       });
       const data = await res.json();

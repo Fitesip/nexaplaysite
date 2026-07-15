@@ -6,7 +6,16 @@
  * httpOnly cookie, then exposes `user` + `setUser` so any component can read
  * or update it (e.g. after login, logout, or editing the profile).
  */
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 export type Role = "user" | "rcon" | "helper" | "admin" | "main_admin";
 export type CurrentUser = {
@@ -19,6 +28,7 @@ export type CurrentUser = {
   minecraft_linked_at: string | null;
   role: Role;
   game_currency: number;
+  balance_kopecks: number;
   forum_banned: boolean;
   forum_banned_until: string | null;
   created_at: string;
@@ -30,7 +40,7 @@ type AuthContextValue = {
   /** Re-fetches /api/auth/me — call after login/register/logout, not on every navigation. */
   refresh: () => Promise<void>;
   /** Set the user directly (e.g. straight from a login/register response) without a round trip. */
-  setUser: (user: CurrentUser | null) => void;
+  setUser: Dispatch<SetStateAction<CurrentUser | null>>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);

@@ -37,8 +37,7 @@ export default function ReferralCard() {
     <div className="glass-panel pixel-corner mt-6 p-6">
       <h3 className="font-[var(--font-display)] text-base font-semibold text-white">Реферальная программа</h3>
       <p className="mt-1 text-sm text-[var(--color-mist)]">
-        Приглашайте друзей на сервер — за каждого зарегистрированного по вашей ссылке вы получите уведомление, а
-        сами приглашённые появятся в списке ниже.
+        Приглашённый друг получает 25 ₽ на баланс, а вы — 5% от суммы каждой его покупки.
       </p>
 
       {loading ? (
