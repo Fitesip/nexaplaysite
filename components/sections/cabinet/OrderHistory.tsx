@@ -5,14 +5,13 @@ import { GAME_MODE_MAP } from "@/components/gameModes";
 import type { Order } from "./types";
 
 /**
- * Accordion list of the player's past orders. Each row expands to show the
- * individual items purchased, the subtotal, any promo-code discount, and the
- * final total — mirroring what they saw at checkout.
+ * List of the player's past orders. Each row shows the individual items
+ * purchased, the subtotal, any promo-code discount, and the final total —
+ * mirroring what they saw at checkout.
  */
 export default function OrderHistory() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/orders", { cache: "no-store" })
@@ -32,13 +31,9 @@ export default function OrderHistory() {
       ) : (
         <div className="mt-4 flex flex-col gap-2">
           {orders.map((order) => {
-            const open = openId === order.id;
             return (
               <div key={order.id} className="border border-white/10">
-                <button
-                  onClick={() => setOpenId(open ? null : order.id)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors duration-300 hover:bg-white/5"
-                >
+                <div className="flex w-full items-center justify-between px-4 py-3 text-left">
                   <div>
                     <span className="font-[var(--font-mono)] text-sm text-white">Заказ №{order.id}</span>
                     <span className="ml-3 text-xs text-[var(--color-mist)]">
@@ -51,25 +46,12 @@ export default function OrderHistory() {
                       })}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-[var(--font-display)] text-sm font-semibold text-white">
-                      {order.total} ₽
-                    </span>
-                    <span
-                      className={`font-[var(--font-mono)] text-xl text-cyan-300 transition-transform duration-300 ${
-                        open ? "rotate-45" : ""
-                      }`}
-                    >
-                      +
-                    </span>
-                  </div>
-                </button>
+                  <span className="font-[var(--font-display)] text-sm font-semibold text-white">
+                    {order.total} ₽
+                  </span>
+                </div>
 
-                {/* grid-rows trick animates height between 0 and auto without a fixed height */}
-                <div
-                  className="grid transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                  style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
-                >
+                <div>
                   <div className="overflow-hidden">
                     <div className="flex flex-col gap-2 border-t border-white/10 px-4 py-3">
                       {order.items.map((item, idx) => (

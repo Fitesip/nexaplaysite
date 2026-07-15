@@ -5,7 +5,7 @@ import { getPool } from "@/lib/db";
 import { requireAdmin, canAssignRole, outranks, type Role } from "@/lib/auth";
 
 const schema = z.object({
-  role: z.enum(["user", "helper", "admin", "main_admin"]).optional(),
+  role: z.enum(["user", "rcon", "helper", "admin", "main_admin"]).optional(),
   banned: z.boolean().optional(),
   banned_reason: z.string().trim().max(255).optional(),
   // hours until the site ban auto-lifts; omit/null = permanent

@@ -6,10 +6,11 @@ const SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
 const COOKIE_NAME = "nexus_session";
 
 export type SessionPayload = { userId: number };
-export type Role = "user" | "helper" | "admin" | "main_admin";
+export type Role = "user" | "rcon" | "helper" | "admin" | "main_admin";
 
 /** Roles that get the "Поддержка" + RCON tabs in the admin panel. */
 const STAFF_ROLES: Role[] = ["helper", "admin", "main_admin"];
+const RCON_ROLES: Role[] = ["rcon", "helper", "admin", "main_admin"];
 /** Roles that get the full admin panel (users + catalog management). */
 const ADMIN_ROLES: Role[] = ["admin", "main_admin"];
 
@@ -160,6 +161,12 @@ export async function requireStaff(): Promise<{ id: number; role: Role; username
   return user;
 }
 
+export async function requireRconAccess(): Promise<{ id: number; role: Role; username: string } | null> {
+  const user = await getCurrentUser();
+  if (!user || !RCON_ROLES.includes(user.role)) return null;
+  return user;
+}
+
 /** Returns the current user if they're admin or main_admin — access to the full admin panel. */
 export async function requireAdmin(): Promise<{ id: number; role: Role; username: string } | null> {
   const user = await getCurrentUser();
@@ -174,7 +181,7 @@ export async function requireMainAdmin(): Promise<{ id: number; role: Role; user
   return user;
 }
 
-const ROLE_RANK: Record<Role, number> = { user: 0, helper: 1, admin: 2, main_admin: 3 };
+const ROLE_RANK: Record<Role, number> = { user: 0, rcon: 1, helper: 2, admin: 3, main_admin: 4 };
 
 /** True if `actor` outranks `target` strictly (needed to act on another user's account). */
 export function outranks(actor: Role, target: Role) {
@@ -190,6 +197,6 @@ export function outranks(actor: Role, target: Role) {
 export function canAssignRole(actor: Role, newRole: Role) {
   if (newRole === "main_admin") return false;
   if (newRole === "admin") return actor === "main_admin";
-  // user / helper
+  // user / rcon / helper
   return actor === "admin" || actor === "main_admin";
 }

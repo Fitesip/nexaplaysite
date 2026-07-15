@@ -1,10 +1,10 @@
 /** GET /api/admin/rcon/history — returns the recent log of RCON commands run through the console. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { requireStaff } from "@/lib/auth";
+import { requireRconAccess } from "@/lib/auth";
 
 export async function GET() {
-  const staff = await requireStaff();
+  const staff = await requireRconAccess();
   if (!staff) {
     return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
   }
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function DELETE() {
-  const staff = await requireStaff();
+  const staff = await requireRconAccess();
   if (!staff) {
     return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
   }

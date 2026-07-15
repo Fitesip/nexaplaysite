@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Main-admin-only RCON console: a terminal-style input/output log for running
+ * RCON console: a terminal-style input/output log for running
  * server commands remotely, plus a live TPS readout. Renders Minecraft's
  * `&`-color-code formatting so command output looks the same as in-game.
  */
@@ -9,11 +9,12 @@ import { useEffect, useRef, useState, FormEvent } from "react";
 import { MinecraftText, ampersandToSectionSign, COLOR_CODE_ENTRIES, FORMAT_CODE_ENTRIES } from "@/lib/minecraft-colors";
 
 type Line = { text: string; kind: "input" | "output" | "error" };
+type ConnectionStatus = "checking" | "connected" | "disconnected" | "unconfigured";
 
 const QUICK_COMMANDS = ["list", "say Привет с сайта!", "whitelist list", "tps"];
 
 export default function AdminRcon() {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("checking");
   const [lines, setLines] = useState<Line[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [command, setCommand] = useState("");
@@ -28,10 +29,25 @@ export default function AdminRcon() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/rcon")
-      .then((r) => (r.ok ? r.json() : { configured: false }))
-      .then((d) => setConfigured(Boolean(d.configured)))
-      .catch(() => setConfigured(false));
+    let cancelled = false;
+
+    const checkConnection = async () => {
+      try {
+        const res = await fetch("/api/admin/rcon", { cache: "no-store" });
+        const data = res.ok ? await res.json() : { configured: false, connected: false };
+        if (cancelled) return;
+        setConnectionStatus(!data.configured ? "unconfigured" : data.connected ? "connected" : "disconnected");
+      } catch {
+        if (!cancelled) setConnectionStatus("disconnected");
+      }
+    };
+
+    checkConnection();
+    const timer = setInterval(checkConnection, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   // Загружаем сохранённую историю консоли этого пользователя один раз при открытии вкладки —
@@ -81,14 +97,19 @@ export default function AdminRcon() {
     }
   };
 
-  // Автообновление TPS каждые 5 секунд, пока вкладка открыта и RCON настроен.
+  // Автообновление TPS каждые 5 секунд, пока вкладка открыта и RCON доступен.
   useEffect(() => {
-    if (configured !== true) return;
+    if (connectionStatus !== "connected") {
+      setTps(null);
+      setTpsLoading(false);
+      return;
+    }
+    setTpsLoading(true);
     loadTps();
     const t = setInterval(loadTps, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configured]);
+  }, [connectionStatus]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -96,7 +117,7 @@ export default function AdminRcon() {
 
   const run = async (raw: string) => {
     const typed = raw.trim();
-    if (!typed || sending) return;
+    if (!typed || sending || connectionStatus !== "connected") return;
     // "&" -> "§" so admins can type codes with a normal keyboard; server always sees the real code.
     const cmd = ampersandToSectionSign(typed);
     setLines((l) => [...l, { text: cmd, kind: "input" }]);
@@ -113,9 +134,10 @@ export default function AdminRcon() {
       const data = await res.json();
       if (!res.ok) {
         setLines((l) => [...l, { text: data.error ?? "Ошибка выполнения команды", kind: "error" }]);
-        if (res.status === 503) setConfigured(false);
+        if (res.status === 503) setConnectionStatus("unconfigured");
+        if (res.status === 502) setConnectionStatus("disconnected");
       } else {
-        setConfigured(true);
+        setConnectionStatus("connected");
         setLines((l) => [...l, { text: data.output, kind: "output" }]);
       }
     } catch {
@@ -180,18 +202,24 @@ export default function AdminRcon() {
         </div>
         <span
           className={`shrink-0 border px-3 py-1.5 text-xs font-medium ${
-            configured === null
+            connectionStatus === "checking"
               ? "border-white/15 text-[var(--color-mist)]"
-              : configured
+              : connectionStatus === "connected"
                 ? "border-emerald-400/40 text-emerald-300"
                 : "border-rose-400/40 text-rose-300"
           }`}
         >
-          {configured === null ? "Проверка подключения…" : configured ? "RCON подключён" : "RCON не настроен"}
+          {connectionStatus === "checking"
+            ? "Проверка подключения…"
+            : connectionStatus === "connected"
+              ? "RCON подключён"
+              : connectionStatus === "unconfigured"
+                ? "RCON не настроен"
+                : "RCON не подключён"}
         </span>
       </div>
 
-      {configured === false && (
+      {connectionStatus === "unconfigured" && (
         <p className="mt-4 border border-rose-400/30 bg-rose-500/5 p-3 text-sm text-rose-200">
           Добавьте <code className="font-[var(--font-mono)]">RCON_HOST</code>,{" "}
           <code className="font-[var(--font-mono)]">RCON_PORT</code> и{" "}
@@ -202,7 +230,14 @@ export default function AdminRcon() {
         </p>
       )}
 
-      {configured === true && (
+      {connectionStatus === "disconnected" && (
+        <p className="mt-4 border border-rose-400/30 bg-rose-500/5 p-3 text-sm text-rose-200">
+          Не удалось подключиться к RCON. Проверьте, что Minecraft-сервер запущен, RCON включён, а адрес, порт и
+          пароль указаны верно. Подключение проверяется автоматически каждые 5 секунд.
+        </p>
+      )}
+
+      {connectionStatus === "connected" && (
         <div className="mt-4 flex flex-wrap items-center gap-4 border border-white/10 bg-black/20 p-4">
           <div>
             <div className="text-xs text-[var(--color-mist)]">TPS сервера</div>
@@ -234,17 +269,18 @@ export default function AdminRcon() {
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {QUICK_COMMANDS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => run(c)}
-            disabled={sending}
-            className="border border-white/10 px-3 py-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-cyan-400/50 hover:text-white disabled:opacity-50"
-          >
-            /{c}
-          </button>
-        ))}
+        {connectionStatus === "connected" &&
+          QUICK_COMMANDS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => run(c)}
+              disabled={sending}
+              className="border border-white/10 px-3 py-1.5 font-[var(--font-mono)] text-xs text-[var(--color-mist)] transition-colors duration-300 hover:border-cyan-400/50 hover:text-white disabled:opacity-50"
+            >
+              /{c}
+            </button>
+          ))}
         <div className="ml-auto flex gap-2">
           <button
             type="button"
@@ -254,21 +290,23 @@ export default function AdminRcon() {
           >
             Очистить историю
           </button>
-          <button
-            type="button"
-            onClick={() => setShowCodes((v) => !v)}
-            className={`border px-3 py-1.5 font-[var(--font-mono)] text-xs transition-colors duration-300 ${
-              showCodes
-                ? "border-cyan-400/50 text-white"
-                : "border-white/10 text-[var(--color-mist)] hover:border-cyan-400/40 hover:text-white"
-            }`}
-          >
-            §a Коды цвета {showCodes ? "▲" : "▼"}
-          </button>
+          {connectionStatus === "connected" && (
+            <button
+              type="button"
+              onClick={() => setShowCodes((v) => !v)}
+              className={`border px-3 py-1.5 font-[var(--font-mono)] text-xs transition-colors duration-300 ${
+                showCodes
+                  ? "border-cyan-400/50 text-white"
+                  : "border-white/10 text-[var(--color-mist)] hover:border-cyan-400/40 hover:text-white"
+              }`}
+            >
+              §a Коды цвета {showCodes ? "▲" : "▼"}
+            </button>
+          )}
         </div>
       </div>
 
-      {showCodes && (
+      {connectionStatus === "connected" && showCodes && (
         <div className="mt-3 border border-white/10 bg-black/30 p-4">
           <p className="text-xs text-[var(--color-mist)]">
             Наберите <code className="font-[var(--font-mono)] text-white">&amp;</code> + код (например{" "}
@@ -336,35 +374,42 @@ export default function AdminRcon() {
         {sending && <p className="text-[var(--color-mist)]/60">Выполняется…</p>}
       </div>
 
-      <form onSubmit={submit} className="mt-4">
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Введите команду, например: say &cПривет!"
-            autoComplete="off"
-            disabled={sending}
-            className="min-w-0 flex-1 border border-white/10 bg-black/30 px-3 py-2 font-[var(--font-mono)] text-sm text-white outline-none transition-colors duration-300 focus:border-cyan-400/60 disabled:opacity-60"
-          />
-          <button
-            disabled={sending || !command.trim()}
-            className="pixel-corner shrink-0 bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.03] disabled:opacity-60"
-          >
-            Отправить
-          </button>
-        </div>
+      {connectionStatus === "connected" ? (
+        <form onSubmit={submit} className="mt-4">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Введите команду, например: say &cПривет!"
+              autoComplete="off"
+              disabled={sending}
+              className="min-w-0 flex-1 border border-white/10 bg-black/30 px-3 py-2 font-[var(--font-mono)] text-sm text-white outline-none transition-colors duration-300 focus:border-cyan-400/60 disabled:opacity-60"
+            />
+            <button
+              disabled={sending || !command.trim()}
+              className="pixel-corner shrink-0 bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.03] disabled:opacity-60"
+            >
+              Отправить
+            </button>
+          </div>
 
-        {/* Live colored preview of what's being typed */}
-        <div className="mt-2 min-h-[1.5rem] border border-white/5 bg-black/20 px-3 py-1.5 font-[var(--font-mono)] text-sm">
-          {command ? (
-            <MinecraftText text={command} />
-          ) : (
-            <span className="text-[var(--color-mist)]/40">Предпросмотр цвета появится здесь…</span>
-          )}
+          <div className="mt-2 min-h-[1.5rem] border border-white/5 bg-black/20 px-3 py-1.5 font-[var(--font-mono)] text-sm">
+            {command ? (
+              <MinecraftText text={command} />
+            ) : (
+              <span className="text-[var(--color-mist)]/40">Предпросмотр цвета появится здесь…</span>
+            )}
+          </div>
+        </form>
+      ) : (
+        <div className="mt-4 border border-white/10 bg-black/20 px-4 py-3 text-sm text-[var(--color-mist)]">
+          {connectionStatus === "checking"
+            ? "Проверяем подключение к RCON…"
+            : "Отправка команд недоступна, пока соединение с RCON не восстановлено."}
         </div>
-      </form>
+      )}
     </div>
   );
 }

@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId, requirePurchaseAccess } from "@/lib/auth";
+import { referralPurchaseRewardKopecks } from "@/lib/rubleBalance";
+import { sendToUser } from "@/lib/ws-hub";
+import { executeGrantCommand } from "@/lib/itemGrant";
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -51,7 +54,14 @@ const schema = z.object({
     )
     .min(1, "Корзина пуста"),
   promoCode: z.string().trim().min(1).optional(),
+  requestId: z.string().uuid(),
 });
+
+type DatabaseError = Error & { code?: string };
+
+function isDuplicateEntry(error: unknown): boolean {
+  return error instanceof Error && (error as DatabaseError).code === "ER_DUP_ENTRY";
+}
 
 export async function POST(req: NextRequest) {
   const gate = await requirePurchaseAccess();
@@ -65,16 +75,51 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { items, promoCode } = parsed.data;
+  const { items, promoCode, requestId } = parsed.data;
 
   const pool = getPool();
   const conn = await pool.getConnection();
+  let referrerBalanceUpdate: { userId: number; balanceKopecks: number } | null = null;
   try {
     await conn.beginTransaction();
 
+    const [existingOrders]: any = await conn.query(
+      `SELECT id, subtotal, discount_amount, total
+       FROM orders
+       WHERE user_id = ? AND checkout_request_id = ?
+       LIMIT 1`,
+      [userId, requestId]
+    );
+    if (existingOrders[0]) {
+      await conn.rollback();
+      return NextResponse.json({
+        ok: true,
+        orderId: existingOrders[0].id,
+        subtotal: existingOrders[0].subtotal,
+        discountAmount: existingOrders[0].discount_amount,
+        total: existingOrders[0].total,
+      });
+    }
+
+    const [buyerRows]: any = await conn.query(
+      "SELECT referred_by, minecraft_username FROM users WHERE id = ?",
+      [userId]
+    );
+    const referredBy = buyerRows[0]?.referred_by ? Number(buyerRows[0].referred_by) : null;
+    const referrerId = referredBy && referredBy !== userId ? referredBy : null;
+    const minecraftUsername = buyerRows[0]?.minecraft_username as string | null;
+    if (!minecraftUsername) {
+      await conn.rollback();
+      return NextResponse.json(
+        { error: "Привяжите Minecraft-аккаунт перед покупкой" },
+        { status: 403 }
+      );
+    }
+
     const ids = items.map((i) => Number(i.id));
     const [catalogRows]: any = await conn.query(
-      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase
+      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase,
+              is_case, grant_command
        FROM catalog_items WHERE id IN (${ids.map(() => "?").join(",")}) FOR UPDATE`,
       ids
     );
@@ -104,6 +149,8 @@ export async function POST(req: NextRequest) {
       game_mode: string;
       price: number;
       qty: number;
+      is_case: boolean;
+      grant_command: string | null;
     }[] = [];
     let subtotal = 0;
 
@@ -141,6 +188,8 @@ export async function POST(req: NextRequest) {
         game_mode: row.game_mode,
         price: row.price,
         qty: item.qty,
+        is_case: Boolean(row.is_case),
+        grant_command: row.grant_command,
       });
       subtotal += row.price * item.qty;
     }
@@ -176,11 +225,13 @@ export async function POST(req: NextRequest) {
     }
 
     const total = Math.max(0, subtotal - discountAmount);
+    const referralRewardKopecks = referrerId ? referralPurchaseRewardKopecks(total) : 0;
 
     const [orderResult]: any = await conn.query(
-      `INSERT INTO orders (user_id, subtotal, discount_amount, total, promo_code)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, subtotal, discountAmount, total, appliedCode]
+      `INSERT INTO orders
+         (user_id, subtotal, discount_amount, total, promo_code, checkout_request_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, subtotal, discountAmount, total, appliedCode, requestId]
     );
     const orderId = orderResult.insertId;
 
@@ -195,13 +246,87 @@ export async function POST(req: NextRequest) {
         `UPDATE catalog_items SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL`,
         [item.qty, item.catalog_item_id]
       );
+      // Кейсы падают в инвентарь пользователя: одна строка на каждый купленный экземпляр,
+      // чтобы каждый кейс открывался отдельно (со своей анимацией и выпавшим предметом).
+      if (item.is_case) {
+        for (let n = 0; n < item.qty; n++) {
+          await conn.query(
+            `INSERT INTO user_cases (user_id, case_id, case_name, game_mode)
+             VALUES (?, ?, ?, ?)`,
+            [userId, item.catalog_item_id, item.name, item.game_mode]
+          );
+        }
+      }
+    }
+
+    if (referrerId && referralRewardKopecks > 0) {
+      const [rewardResult]: any = await conn.query(
+        `UPDATE users
+         SET balance_kopecks = balance_kopecks + ?
+         WHERE id = ?`,
+        [referralRewardKopecks, referrerId]
+      );
+      if (rewardResult.affectedRows > 0) {
+        const [balanceRows]: any = await conn.query(
+          "SELECT balance_kopecks FROM users WHERE id = ?",
+          [referrerId]
+        );
+        referrerBalanceUpdate = {
+          userId: referrerId,
+          balanceKopecks: Number(balanceRows[0].balance_kopecks),
+        };
+      }
+    }
+
+    for (const item of orderItems) {
+      if (!item.grant_command) continue;
+      const granted = await executeGrantCommand(
+        item.grant_command,
+        minecraftUsername,
+        item.qty
+      );
+      if (!granted) {
+        await conn.rollback();
+        return NextResponse.json(
+          {
+            error:
+              "Не удалось подключиться к RCON. Заказ не оформлен, товар и деньги не списаны.",
+          },
+          { status: 502 }
+        );
+      }
     }
 
     await conn.commit();
 
+    if (referrerBalanceUpdate) {
+      sendToUser(referrerBalanceUpdate.userId, {
+        type: "balance_update",
+        data: { balanceKopecks: referrerBalanceUpdate.balanceKopecks },
+      });
+    }
+
     return NextResponse.json({ ok: true, orderId, subtotal, discountAmount, total }, { status: 201 });
   } catch (err) {
     await conn.rollback();
+    if (isDuplicateEntry(err)) {
+      const [existingOrders]: any = await pool.query(
+        `SELECT id, subtotal, discount_amount, total
+         FROM orders
+         WHERE user_id = ? AND checkout_request_id = ?
+         LIMIT 1`,
+        [userId, requestId]
+      );
+      if (existingOrders[0]) {
+        return NextResponse.json({
+          ok: true,
+          orderId: existingOrders[0].id,
+          subtotal: existingOrders[0].subtotal,
+          discountAmount: existingOrders[0].discount_amount,
+          total: existingOrders[0].total,
+        });
+      }
+    }
     throw err;
   } finally {
     conn.release();

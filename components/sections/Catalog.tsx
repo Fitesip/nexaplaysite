@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCart, cartKey } from "@/lib/cart-context";
 import { GAME_MODE_MAP, gradientStops, withAlpha, type GameMode } from "@/components/gameModes";
+import CaseContentsModal from "@/components/cases/CaseContentsModal";
 
 type Item = {
   id: number;
@@ -18,6 +19,7 @@ type Item = {
   price: number;
   stock: number | null; // null = неограниченное количество
   oneTimePurchase: boolean; // можно купить только один раз на аккаунт
+  isCase: boolean; // кейс: падает в инвентарь и открывается с анимацией
   purchased: boolean; // уже куплен этим пользователем (актуально только для oneTimePurchase)
   description: string;
 };
@@ -28,6 +30,7 @@ export default function Catalog({ mode }: { mode: GameMode }) {
   const [filter, setFilter] = useState<string>("Все");
   const { items: cartItems, addItem } = useCart();
   const [addedId, setAddedId] = useState<number | null>(null);
+  const [previewCase, setPreviewCase] = useState<{ id: number; name: string } | null>(null);
   const meta = GAME_MODE_MAP[mode];
 
   useEffect(() => {
@@ -151,9 +154,27 @@ export default function Catalog({ mode }: { mode: GameMode }) {
                       </span>
                       <span className="font-[var(--font-display)] font-semibold text-white">{item.price} ₽</span>
                     </div>
-                    <h3 className="mt-3 font-[var(--font-display)] text-lg font-semibold text-white">{item.name}</h3>
+                    <div className="mt-3 flex items-center gap-2">
+                      <h3 className="font-[var(--font-display)] text-lg font-semibold text-white">{item.name}</h3>
+                      {item.isCase && (
+                        <span
+                          className="pixel-corner-sm shrink-0 border px-2 py-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wide"
+                          style={{ borderColor: `${meta.accent}66`, color: meta.accent }}
+                        >
+                          Кейс
+                        </span>
+                      )}
+                    </div>
                     {item.description && (
                       <p className="mt-2 text-sm text-[var(--color-mist)]">{item.description}</p>
+                    )}
+                    {item.isCase && (
+                      <button
+                        onClick={() => setPreviewCase({ id: item.id, name: item.name })}
+                        className="mt-2 font-[var(--font-mono)] text-xs text-cyan-300 underline underline-offset-2 transition-colors hover:text-white"
+                      >
+                        Посмотреть содержимое
+                      </button>
                     )}
                     {item.stock !== null && (
                       <p className="mt-2 text-xs text-[var(--color-mist)]/80">
@@ -184,6 +205,14 @@ export default function Catalog({ mode }: { mode: GameMode }) {
             })}
           </div>
         </>
+      )}
+
+      {previewCase && (
+        <CaseContentsModal
+          caseId={previewCase.id}
+          caseName={previewCase.name}
+          onClose={() => setPreviewCase(null)}
+        />
       )}
     </div>
   );

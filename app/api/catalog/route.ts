@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const pool = getPool();
   const [rows]: any = await pool.query(
     `SELECT id, name, category, game_mode AS gameMode, price_rub AS price, stock,
-            one_time_purchase AS oneTimePurchase, description
+            one_time_purchase AS oneTimePurchase, is_case AS isCase, description
      FROM catalog_items
      WHERE hidden = 0 ${mode ? "AND game_mode = ?" : ""}
      ORDER BY category ASC, id ASC`,
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
   const items = rows.map((r: any) => ({
     ...r,
     oneTimePurchase: Boolean(r.oneTimePurchase),
+    isCase: Boolean(r.isCase),
     purchased: purchasedIds.has(r.id),
   }));
 

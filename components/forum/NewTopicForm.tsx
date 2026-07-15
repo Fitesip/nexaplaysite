@@ -5,6 +5,7 @@ import { useEffect, useState, FormEvent, KeyboardEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
 
 type Category = { id: number; slug: string; name: string; description: string | null };
+type PopularTag = { id: number; name: string; topic_count: number };
 
 export default function NewTopicForm({
   onCreated,
@@ -19,6 +20,7 @@ export default function NewTopicForm({
   const [body, setBody] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [popularTags, setPopularTags] = useState<PopularTag[]>([]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { user } = useAuth();
@@ -32,6 +34,26 @@ export default function NewTopicForm({
       })
       .catch(() => setError("Не удалось загрузить категории"));
   }, []);
+
+  // Suggest the top-5 most-used tags within the selected category.
+  useEffect(() => {
+    if (!categoryId) {
+      setPopularTags([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/forum/tags?category=${categoryId}&limit=5`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setPopularTags(d.tags ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPopularTags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId]);
 
   const addTag = (raw: string) => {
     const value = raw.trim().toLowerCase().replace(/^#/, "");
@@ -189,6 +211,35 @@ export default function NewTopicForm({
                 />
               )}
             </div>
+
+            {tags.length < 5 &&
+              (() => {
+                const q = tagInput.trim().toLowerCase().replace(/^#/, "");
+                const suggestions = popularTags.filter(
+                  (t) => !tags.includes(t.name) && (!q || t.name.includes(q))
+                );
+                if (suggestions.length === 0) return null;
+                return (
+                  <div className="mt-2">
+                    <p className="mb-1.5 font-[var(--font-mono)] text-[11px] text-[var(--color-mist)]/60">
+                      Популярные теги в этой категории:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestions.map((t) => (
+                        <button
+                          type="button"
+                          key={t.id}
+                          onClick={() => addTag(t.name)}
+                          className="pixel-corner flex items-center gap-1.5 border border-white/10 px-2.5 py-1 font-[var(--font-mono)] text-xs text-[var(--color-mist)] transition-colors hover:border-cyan-400/50 hover:text-white"
+                        >
+                          <span className="text-cyan-300">#{t.name}</span>
+                          <span className="text-[10px] text-[var(--color-mist)]/60">{t.topic_count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
           </div>
 
           {error && <p className="text-sm text-rose-400">{error}</p>}

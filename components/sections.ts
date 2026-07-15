@@ -6,7 +6,6 @@ export type SectionId =
   | "forum"
   | "tips"
   | "faq"
-  | "contact"
   | "cabinet"
   | "cart"
   | "admin";

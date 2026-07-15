@@ -1,5 +1,6 @@
 import Avatar from "@/components/Avatar";
 import type { CurrentUser } from "@/lib/auth-context";
+import { formatRubleBalance } from "@/lib/rubleBalance";
 
 /** Cabinet shortcut: a generic person icon when logged out, the user's avatar once logged in. */
 export default function CabinetNavButton({
@@ -28,7 +29,12 @@ export default function CabinetNavButton({
           <path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5" strokeLinecap="round" />
         </svg>
       )}
-      <span className="hidden sm:inline">Кабинет</span>
+      <span className="hidden sm:inline">{user ? user.username : "Кабинет"}</span>
+      {user && (
+        <span className="inline-flex h-5 items-center font-[var(--font-mono)] text-[11px] leading-none text-cyan-300">
+          {formatRubleBalance(user.balance_kopecks)}
+        </span>
+      )}
     </button>
   );
 }

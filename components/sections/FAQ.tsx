@@ -22,7 +22,7 @@ const FAQS = [
   },
   {
     q: "Что делать, если забанили несправедливо?",
-    a: "Опишите ситуацию в разделе «Связь» с темой «Жалоба на игрока» — модераторы разберут обращение и ответят в течение суток.",
+    a: "Опишите ситуацию в поддержке личного кабинета или создайте тему на форуме — модераторы разберут обращение и ответят в течение суток.",
   },
 ];
 
@@ -35,14 +35,18 @@ export default function FAQ() {
         Частые <span className="grad-text">вопросы</span>
       </h2>
       <p className="mt-3 max-w-2xl text-[var(--color-mist)]">
-        Не нашли ответ? Загляните в раздел «Связь» — мы читаем каждое сообщение.
+        Не нашли ответ? Напишите в поддержку личного кабинета — мы читаем каждое сообщение.
       </p>
 
       <div className="mt-8 flex flex-col gap-3">
         {FAQS.map((item, i) => {
           const isOpen = open === i;
           return (
-            <div key={item.q} className="glass-panel pixel-corner overflow-hidden">
+            <div
+              key={item.q}
+              className="section-enter glass-panel pixel-corner overflow-hidden"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <button
                 onClick={() => setOpen(isOpen ? null : i)}
                 className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"

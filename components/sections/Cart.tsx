@@ -27,9 +27,14 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const skipNextRevalidate = useRef(false);
+  const checkoutRequestIdRef = useRef<string | null>(null);
 
   const discount = promo.status === "applied" ? promo.discountAmount : 0;
   const total = Math.max(0, subtotal - discount);
+
+  useEffect(() => {
+    checkoutRequestIdRef.current = null;
+  }, [items, promo]);
 
   // Group cart lines by game mode so items from different modes are visually
   // separated instead of being shown as one undifferentiated list.
@@ -39,6 +44,15 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
         (g) => g.items.length > 0
       ),
     [items]
+  );
+  const itemAnimationIndex = useMemo(
+    () =>
+      new Map(
+        groupedByMode
+          .flatMap((group) => group.items)
+          .map((item, index) => [item.id, index])
+      ),
+    [groupedByMode]
   );
 
   const validateAgainstServer = async (code: string, currentSubtotal: number) => {
@@ -106,6 +120,8 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
   const checkout = async () => {
     setCheckingOut(true);
     setCheckoutError("");
+    const requestId = checkoutRequestIdRef.current ?? crypto.randomUUID();
+    checkoutRequestIdRef.current = requestId;
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -113,6 +129,7 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
         body: JSON.stringify({
           items: items.map((i) => ({ id: i.catalogId, qty: i.qty })),
           promoCode: promo.status === "applied" ? promo.code : undefined,
+          requestId,
         }),
       });
       const data = await res.json();
@@ -195,8 +212,11 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
                   {group.items.map((item) => (
                     <div
                       key={item.id}
-                      className="glass-panel pixel-corner flex items-center gap-4 border-l-2 p-4"
-                      style={{ borderLeftColor: group.meta.accent }}
+                      className="section-enter glass-panel pixel-corner flex items-center gap-4 border-l-2 p-4"
+                      style={{
+                        borderLeftColor: group.meta.accent,
+                        animationDelay: `${(itemAnimationIndex.get(item.id) ?? 0) * 60}ms`,
+                      }}
                     >
                       <div className="min-w-0 flex-1">
                         <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-wide text-cyan-300/80">

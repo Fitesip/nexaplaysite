@@ -20,7 +20,6 @@ const NAV_AFTER_CATALOG: { id: SectionId; label: string }[] = [
   { id: "forum", label: "Форум" },
   { id: "tips", label: "Рекомендации" },
   { id: "faq", label: "FAQ" },
-  { id: "contact", label: "Связь" },
 ];
 
 /** All section ids that live inside the sliding-pill nav bar (as opposed to the icon buttons on the right). */
@@ -46,7 +45,7 @@ export default function NavBar({
   const { user } = useAuth();
   const { unreadTotal: supportUnread } = useAdminChats();
   const role = user?.role ?? null;
-  const isStaff = role === "helper" || role === "admin" || role === "main_admin";
+  const hasPanelAccess = role === "rcon" || role === "helper" || role === "admin" || role === "main_admin";
 
   const isPillSection = PILL_SECTION_IDS.includes(active);
   // `mode` is passed as an extra dependency because the catalog button's label switches
@@ -154,10 +153,10 @@ export default function NavBar({
 
         {/* Cart + Admin + Cabinet */}
         <div className="flex items-center gap-2 justify-self-end">
-          {isStaff && (
+          {hasPanelAccess && (
             <AdminNavButton
               active={active === "admin"}
-              role={role as "helper" | "admin" | "main_admin"}
+              role={role as "rcon" | "helper" | "admin" | "main_admin"}
               unreadCount={supportUnread}
               onClick={() => onChange("admin")}
             />

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { normalizeGrantCommand, validateGrantCommand } from "@/lib/itemGrant";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -12,7 +13,8 @@ export async function GET() {
 
   const pool = getPool();
   const [rows]: any = await pool.query(
-    `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase, description, created_at
+    `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase,
+            is_case, grant_command, description, created_at
      FROM catalog_items
      ORDER BY created_at DESC`
   );
@@ -24,6 +26,7 @@ export async function GET() {
     ...r,
     hidden: Boolean(r.hidden),
     one_time_purchase: Boolean(r.one_time_purchase),
+    is_case: Boolean(r.is_case),
   }));
 
   return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
@@ -42,6 +45,9 @@ const schema = z.object({
   hidden: z.boolean().optional().default(false),
   // true = каждый пользователь может купить этот товар только один раз (независимо от stock)
   oneTimePurchase: z.boolean().optional().default(false),
+  // true = это кейс (лутбокс): падает в инвентарь и открывается с анимацией
+  isCase: z.boolean().optional().default(false),
+  grantCommand: z.string().trim().max(500).nullable().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -55,13 +61,40 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { name, category, gameMode, price, description, stock, hidden, oneTimePurchase } = parsed.data;
+  const {
+    name,
+    category,
+    gameMode,
+    price,
+    description,
+    stock,
+    hidden,
+    oneTimePurchase,
+    isCase,
+  } = parsed.data;
+  const grantCommand = isCase ? null : normalizeGrantCommand(parsed.data.grantCommand);
+  const grantCommandError = validateGrantCommand(grantCommand);
+  if (grantCommandError) {
+    return NextResponse.json({ error: grantCommandError }, { status: 400 });
+  }
 
   const pool = getPool();
   const [result]: any = await pool.query(
-    `INSERT INTO catalog_items (name, category, game_mode, price_rub, stock, hidden, one_time_purchase, description)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, category, gameMode, price, stock ?? null, hidden ? 1 : 0, oneTimePurchase ? 1 : 0, description]
+    `INSERT INTO catalog_items
+       (name, category, game_mode, price_rub, stock, hidden, one_time_purchase, is_case, grant_command, description)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name,
+      category,
+      gameMode,
+      price,
+      stock ?? null,
+      hidden ? 1 : 0,
+      oneTimePurchase ? 1 : 0,
+      isCase ? 1 : 0,
+      grantCommand,
+      description,
+    ]
   );
 
   return NextResponse.json({ id: result.insertId }, { status: 201 });
