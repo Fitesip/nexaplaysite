@@ -4,7 +4,14 @@
  *  weight. The drop chance (weight / total weight) is shown live so admins can balance a case
  *  without doing the maths by hand. Saving replaces the whole pool via PUT /api/admin/cases/:id. */
 import { useEffect, useMemo, useState } from "react";
-import { RARITIES, RARITY_MAP, type Rarity } from "@/lib/rarity";
+import { createPortal } from "react-dom";
+import {
+  DEFAULT_RARITY_WEIGHT,
+  RARITIES,
+  RARITY_MAP,
+  sortByRarity,
+  type Rarity,
+} from "@/lib/rarity";
 
 type Row = { name: string; rarity: Rarity; weight: string };
 
@@ -21,6 +28,9 @@ export default function CaseLootEditor({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     fetch(`/api/admin/cases/${caseId}`, { cache: "no-store" })
@@ -29,8 +39,12 @@ export default function CaseLootEditor({
         const items = (d.items ?? []) as { name: string; rarity: Rarity; weight: number }[];
         setRows(
           items.length > 0
-            ? items.map((i) => ({ name: i.name, rarity: i.rarity, weight: String(i.weight) }))
-            : [{ name: "", rarity: "common", weight: "1" }]
+            ? sortByRarity(items).map((i) => ({
+                name: i.name,
+                rarity: i.rarity,
+                weight: String(i.weight),
+              }))
+            : [{ name: "", rarity: "common", weight: String(DEFAULT_RARITY_WEIGHT.common) }]
         );
       })
       .finally(() => setLoading(false));
@@ -44,7 +58,16 @@ export default function CaseLootEditor({
   const update = (idx: number, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
 
-  const addRow = () => setRows((prev) => [...prev, { name: "", rarity: "common", weight: "1" }]);
+  const addRow = () =>
+    setRows((prev) => [
+      ...prev,
+      { name: "", rarity: "common", weight: String(DEFAULT_RARITY_WEIGHT.common) },
+    ]);
+
+  // Changing a row's rarity pre-fills the suggested default weight for that rarity so
+  // rarer items get a lower drop chance by default (admins can still tweak it).
+  const changeRarity = (idx: number, rarity: Rarity) =>
+    update(idx, { rarity, weight: String(DEFAULT_RARITY_WEIGHT[rarity]) });
   const removeRow = (idx: number) => setRows((prev) => prev.filter((_, i) => i !== idx));
 
   const save = async () => {
@@ -77,7 +100,9 @@ export default function CaseLootEditor({
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <div className="glass-panel pixel-corner relative flex max-h-[88vh] w-full max-w-2xl flex-col p-6">
         <button
@@ -119,7 +144,7 @@ export default function CaseLootEditor({
                       />
                       <select
                         value={row.rarity}
-                        onChange={(e) => update(idx, { rarity: e.target.value as Rarity })}
+                        onChange={(e) => changeRarity(idx, e.target.value as Rarity)}
                         className="border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
                       >
                         {RARITIES.map((r) => (
@@ -186,6 +211,7 @@ export default function CaseLootEditor({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

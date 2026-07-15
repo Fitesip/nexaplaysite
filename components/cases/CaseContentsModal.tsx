@@ -3,7 +3,8 @@
 /** Read-only preview of a case's loot pool (name + rarity + drop chance), opened from the
  *  catalog card so a shopper can see what's inside before buying. */
 import { useEffect, useMemo, useState } from "react";
-import { RARITY_MAP } from "@/lib/rarity";
+import { createPortal } from "react-dom";
+import { RARITY_MAP, sortByRarity } from "@/lib/rarity";
 import type { CaseLootItem } from "./types";
 
 export default function CaseContentsModal({
@@ -17,6 +18,9 @@ export default function CaseContentsModal({
 }) {
   const [items, setItems] = useState<CaseLootItem[] | null>(null);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     fetch(`/api/cases/${caseId}/contents`, { cache: "no-store" })
@@ -29,9 +33,11 @@ export default function CaseContentsModal({
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"));
   }, [caseId]);
 
-  const sorted = useMemo(() => (items ? [...items].sort((a, b) => b.chance - a.chance) : []), [items]);
+  const sorted = useMemo(() => (items ? sortByRarity(items) : []), [items]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <div className="glass-panel pixel-corner relative w-full max-w-lg p-6">
         <button
@@ -82,6 +88,7 @@ export default function CaseContentsModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

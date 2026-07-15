@@ -154,6 +154,46 @@ body {
   }
 }
 
+/* Case-opening win reveal: the dropped item pops in with a spring + settle, and a
+   soft radial glow flares behind it. Paired with .case-winner-tile (below) which
+   makes the landed reel tile pulse. */
+.case-drop {
+  animation: caseDrop 0.7s cubic-bezier(0.18, 1.4, 0.4, 1) both;
+}
+@keyframes caseDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.6);
+    filter: blur(6px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.12);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.case-flare {
+  animation: caseFlare 0.9s ease-out both;
+}
+@keyframes caseFlare {
+  0% { opacity: 0; transform: scale(0.4); }
+  40% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+.case-winner-tile {
+  animation: caseWinnerPulse 1.1s ease-in-out infinite;
+}
+@keyframes caseWinnerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
 /* Minecraft "§k" obfuscated text: hint that the underlying text is scrambled in-game
    without needing per-frame character randomization. */
 .mc-obfuscated {

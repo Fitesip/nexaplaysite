@@ -7,7 +7,8 @@
  * is purely presentational, built so the pre-chosen winner sits under the marker.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RARITY_MAP, type Rarity } from "@/lib/rarity";
+import { createPortal } from "react-dom";
+import { RARITY_MAP, sortByRarity, type Rarity } from "@/lib/rarity";
 import type { CaseLootItem } from "./types";
 
 type OpenResult = {
@@ -44,8 +45,13 @@ export default function CaseRoulette({
   const [reel, setReel] = useState<CaseLootItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+
+  // Render through a portal on <body> so the overlay isn't clipped by an ancestor
+  // that establishes a containing block (the account card uses backdrop-filter).
+  useEffect(() => setMounted(true), []);
 
   // Fire the open request once, build the reel around the winner, then trigger the spin.
   useEffect(() => {
@@ -109,14 +115,13 @@ export default function CaseRoulette({
 
   const wonMeta = result ? RARITY_MAP[result.won.rarity] : null;
 
-  const sortedPool = useMemo(() => {
-    if (!result) return [];
-    return [...result.items].sort((a, b) => b.chance - a.chance);
-  }, [result]);
+  const sortedPool = useMemo(() => (result ? sortByRarity(result.items) : []), [result]);
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <div className="glass-panel pixel-corner relative w-full max-w-3xl p-6 sm:p-8">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm">
+      <div className="glass-panel pixel-corner relative my-auto flex max-h-[92vh] w-full max-w-3xl flex-col overflow-y-auto p-6 sm:p-8">
         <button
           onClick={onClose}
           aria-label="Закрыть"
@@ -178,7 +183,7 @@ export default function CaseRoulette({
                     <div
                       key={idx}
                       className={`relative flex shrink-0 flex-col justify-between overflow-hidden border p-3 transition-opacity ${
-                        isWinner ? "opacity-100" : phase === "done" ? "opacity-40" : "opacity-100"
+                        isWinner ? "case-winner-tile opacity-100" : phase === "done" ? "opacity-40" : "opacity-100"
                       }`}
                       style={{
                         width: `${TILE_WIDTH}px`,
@@ -206,20 +211,27 @@ export default function CaseRoulette({
 
             {/* result */}
             {phase === "done" && result && wonMeta && (
-              <div className="section-enter mt-6 text-center">
-                <p className="text-xs uppercase tracking-wide text-[var(--color-mist)]">Вам выпало</p>
-                <p
-                  className="mt-1 font-[var(--font-display)] text-2xl font-bold"
-                  style={{ color: wonMeta.color }}
-                >
-                  {result.won.name}
-                </p>
-                <span
-                  className="mt-2 inline-block border px-3 py-1 font-[var(--font-mono)] text-xs uppercase tracking-wide"
-                  style={{ borderColor: `${wonMeta.color}66`, color: wonMeta.color }}
-                >
-                  {wonMeta.label}
-                </span>
+              <div className="relative mt-6 text-center">
+                {/* radial glow flare behind the reveal */}
+                <div
+                  className="case-flare pointer-events-none absolute left-1/2 top-1/2 -z-10 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{ background: `radial-gradient(circle, ${wonMeta.color}66, transparent 70%)` }}
+                />
+                <div className="case-drop">
+                  <p className="text-xs uppercase tracking-wide text-[var(--color-mist)]">Вам выпало</p>
+                  <p
+                    className="mt-1 font-[var(--font-display)] text-2xl font-bold drop-shadow-[0_0_12px_currentColor] sm:text-3xl"
+                    style={{ color: wonMeta.color }}
+                  >
+                    {result.won.name}
+                  </p>
+                  <span
+                    className="mt-2 inline-block border px-3 py-1 font-[var(--font-mono)] text-xs uppercase tracking-wide"
+                    style={{ borderColor: `${wonMeta.color}66`, color: wonMeta.color }}
+                  >
+                    {wonMeta.label}
+                  </span>
+                </div>
                 <div className="mt-6 flex justify-center">
                   <button
                     onClick={onClose}
@@ -234,6 +246,7 @@ export default function CaseRoulette({
             {phase === "spinning" && (
               <p className="mt-6 text-center text-sm text-[var(--color-mist)]">Крутим барабан…</p>
             )}
+
 
             {/* full loot pool with chances (shown once opened) */}
             {phase === "done" && sortedPool.length > 0 && (
@@ -265,6 +278,7 @@ export default function CaseRoulette({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

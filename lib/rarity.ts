@@ -59,3 +59,38 @@ export const RARITY_MAP: Record<Rarity, RarityMeta> = {
 export function isRarity(value: unknown): value is Rarity {
   return typeof value === "string" && (RARITIES as readonly string[]).includes(value);
 }
+
+/** Numeric rank of each rarity (common = 0 … mythic = 5). Handy for sorting. */
+export const RARITY_RANK: Record<Rarity, number> = RARITIES.reduce(
+  (acc, r, i) => ({ ...acc, [r]: i }),
+  {} as Record<Rarity, number>
+);
+
+/**
+ * Suggested default weight per rarity — the rarer the item, the lower the weight
+ * (and therefore the drop chance). Used by the admin loot editor to pre-fill a
+ * sensible weight when a row's rarity changes, so "rarer = lower chance" holds
+ * out of the box. Admins can still override any weight.
+ */
+export const DEFAULT_RARITY_WEIGHT: Record<Rarity, number> = {
+  common: 50,
+  uncommon: 25,
+  rare: 10,
+  epic: 5,
+  legendary: 2,
+  mythic: 1,
+};
+
+/**
+ * Sort loot items by rarity, rarest first (mythic → common), breaking ties by the
+ * higher drop chance (or weight) first. Returns a new array.
+ */
+export function sortByRarity<T extends { rarity: Rarity; chance?: number; weight?: number }>(
+  items: readonly T[]
+): T[] {
+  return [...items].sort((a, b) => {
+    const byRarity = RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity];
+    if (byRarity !== 0) return byRarity;
+    return (b.chance ?? b.weight ?? 0) - (a.chance ?? a.weight ?? 0);
+  });
+}
