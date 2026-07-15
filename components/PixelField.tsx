@@ -318,7 +318,7 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
 
         const halo = p.size / 2 + 9;
         const hg = ctx!.createRadialGradient(cx, cy, p.size * 0.4, cx, cy, halo);
-        hg.addColorStop(0, `hsla(${hue}, ${sat}%, ${Math.min(light + 8, 92)}%, ${shimmer * 0.5})`);
+        hg.addColorStop(0, `hsla(${hue}, ${sat}%, ${Math.min(light + 8, 92)}%, ${shimmer * 0.28})`);
         hg.addColorStop(1, `hsla(${hue}, ${sat}%, ${light}%, 0)`);
         ctx!.fillStyle = hg;
         ctx!.fillRect(cx - halo, cy - halo, halo * 2, halo * 2);
