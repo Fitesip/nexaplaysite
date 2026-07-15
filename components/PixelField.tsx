@@ -115,6 +115,9 @@ type Pixel = {
   /** fixed spot (0..1) inside the theme's hue range; gives spatial color variety
    *  without the pixel racing through the whole palette over time */
   hueOffset: number;
+  /** the pixel's hue at the start of the current theme transition; it crossfades from here
+   *  toward its new fixed hue along the shortest arc, so switching never sweeps the wheel */
+  hueFrom: number;
   huePhase: number;
   hueSpeedBase: number;
   lightPhase: number;
@@ -124,11 +127,19 @@ type Pixel = {
 };
 
 /**
- * Time constant (ms) for morphing the current theme toward the target. Applied against a
- * clamped delta-time so the morph is a gentle ~3s and framerate-independent, instead of
- * lurching (which read as pixels "frantically" flickering through colors on a mode switch).
+ * Time constant (ms) for morphing the current theme's scalar characteristics (backdrop,
+ * saturation, lightness, speeds, grid) toward the target. Applied against a clamped
+ * delta-time so the morph is a gentle ~3s and framerate-independent.
  */
 const EASE_TAU = 1300;
+
+/** Duration (ms) of the per-pixel hue crossfade when the theme changes. */
+const HUE_TRANS_MS = 1400;
+
+/** Smoothstep for a gentle ease-in-out of the hue crossfade. */
+function smooth(x: number): number {
+  return x * x * (3 - 2 * x);
+}
 
 /** How many degrees a pixel's hue drifts around its fixed offset — small, just for life. */
 const HUE_SHIMMER_DEG = 7;
@@ -188,18 +199,25 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const COUNT = Math.min(90, Math.floor((width * height) / 22000));
-    const pixels: Pixel[] = Array.from({ length: COUNT }, spawn);
     // Current, interpolated theme — starts exactly at the initial target (no intro fade).
     const cur = cloneTheme(targetRef.current);
+    // Hue transition state: the field crossfades each pixel from its current hue toward the
+    // target theme's fixed per-pixel hue. `toA`/`toSpan` track the theme we're heading to.
+    let toA = targetRef.current.hueA;
+    let toSpan = targetRef.current.hueSpan;
+    let hueProg = 1;
+    const pixels: Pixel[] = Array.from({ length: COUNT }, spawn);
 
     function spawn(): Pixel {
+      const hueOffset = Math.random();
       return {
         x: Math.random() * width,
         y: Math.random() * height,
         size: 6 + Math.random() * 22,
         vxBase: (Math.random() - 0.5) * 0.15,
         vyBase: (Math.random() - 0.5) * 0.15,
-        hueOffset: Math.random(),
+        hueOffset,
+        hueFrom: toA + toSpan * hueOffset,
         huePhase: Math.random() * Math.PI * 2,
         hueSpeedBase: 0.0006 + Math.random() * 0.001,
         lightPhase: Math.random() * Math.PI * 2,
@@ -217,8 +235,6 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
 
     function easeTowardTarget(k: number) {
       const tg = targetRef.current;
-      cur.hueA = lerpAngle(cur.hueA, tg.hueA, k);
-      cur.hueSpan = lerp(cur.hueSpan, tg.hueSpan, k);
       cur.satMin = lerp(cur.satMin, tg.satMin, k);
       cur.satMax = lerp(cur.satMax, tg.satMax, k);
       cur.lightMin = lerp(cur.lightMin, tg.lightMin, k);
@@ -252,6 +268,21 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
       lastNow = now;
       clock += dt;
       easeTowardTarget(1 - Math.exp(-dt / EASE_TAU));
+
+      // On a theme change, freeze each pixel's currently-shown hue as its crossfade start,
+      // then head to the new theme. Doing it per pixel (not by lerping hueA/hueSpan) means the
+      // hue only travels the shortest arc to its new fixed spot instead of sweeping the wheel.
+      const tg = targetRef.current;
+      if (tg.hueA !== toA || tg.hueSpan !== toSpan) {
+        const e = smooth(hueProg);
+        for (const p of pixels) p.hueFrom = lerpAngle(p.hueFrom, toA + toSpan * p.hueOffset, e);
+        toA = tg.hueA;
+        toSpan = tg.hueSpan;
+        hueProg = 0;
+      }
+      if (hueProg < 1) hueProg = Math.min(1, hueProg + dt / HUE_TRANS_MS);
+      const hueEase = smooth(hueProg);
+
       applyGrid();
 
       ctx!.clearRect(0, 0, width, height);
@@ -271,7 +302,8 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         // never sweeps the whole palette (that read as "frantic" cycling on wide-range themes).
         const hueShimmer =
           HUE_SHIMMER_DEG * Math.sin(clock * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
-        const hue = cur.hueA + cur.hueSpan * p.hueOffset + hueShimmer;
+        const hueTarget = toA + toSpan * p.hueOffset;
+        const hue = lerpAngle(p.hueFrom, hueTarget, hueEase) + hueShimmer;
         const lightMix = 0.5 + 0.5 * Math.sin(clock * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
