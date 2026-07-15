@@ -120,8 +120,12 @@ type Pixel = {
   speedBase: number;
 };
 
-/** Per-frame easing factor for morphing the current theme toward the target. */
-const EASE = 0.045;
+/**
+ * Per-frame easing factor for morphing the current theme toward the target. Kept low so
+ * the palette shifts gradually (a gentle ~3s morph) instead of lurching in the first frames,
+ * which read as pixels "frantically" flickering through colors on a mode switch.
+ */
+const EASE = 0.013;
 
 function cloneTheme(t: Theme): Theme {
   return {
