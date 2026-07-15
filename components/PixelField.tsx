@@ -308,12 +308,16 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
 
+        // Soft glow via a larger, faint block behind the crisp pixel instead of canvas
+        // `shadowBlur`. Per-pixel shadowBlur is GPU/driver-heavy and can degrade the canvas
+        // over time on real hardware (flicker/color artifacts that a reload resets); a plain
+        // extra fillRect is cheap and stable everywhere.
+        const glow = p.size * 0.9;
+        ctx!.fillStyle = `hsla(${hue}, ${sat}%, ${Math.min(light + 10, 90)}%, ${shimmer * 0.16})`;
+        ctx!.fillRect(p.x - glow, p.y - glow, p.size + glow * 2, p.size + glow * 2);
         ctx!.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${shimmer})`;
-        ctx!.shadowColor = `hsla(${hue}, ${sat}%, ${Math.min(light + 10, 90)}%, 0.8)`;
-        ctx!.shadowBlur = p.size * 0.8;
         ctx!.fillRect(p.x, p.y, p.size, p.size);
       }
-      ctx!.shadowBlur = 0;
       if (!reduced) raf = requestAnimationFrame(draw);
     }
 
