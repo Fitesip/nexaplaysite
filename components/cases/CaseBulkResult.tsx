@@ -2,7 +2,7 @@
 
 /** Overlay that opens several cases at once (POST /api/cases/open-bulk) and shows every drop in a
  *  grid — no reel, since mass opening is the "skip the animation" path by design. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RARITY_MAP, sortByRarity } from "@/lib/rarity";
 import { ITEM_TYPE_MAP } from "@/lib/itemType";
@@ -26,11 +26,17 @@ export default function CaseBulkResult({
   const [phase, setPhase] = useState<"loading" | "done" | "error">("loading");
   const [error, setError] = useState("");
   const [results, setResults] = useState<BulkOpenResult[]>([]);
+  const startedRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
+  // Fire the bulk-open request exactly once. Without this guard a re-render (or React's
+  // StrictMode double-mount) would POST twice — the second call finds no unopened cases
+  // left and fails with "Нет доступных кейсов для открытия".
   useEffect(() => {
-    let cancelled = false;
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     (async () => {
       try {
         const res = await fetch("/api/cases/open-bulk", {
@@ -39,7 +45,6 @@ export default function CaseBulkResult({
           body: JSON.stringify({ caseId, count }),
         });
         const data = await res.json().catch(() => null);
-        if (cancelled) return;
         if (!res.ok) {
           setError(data?.error ?? "Не удалось открыть кейсы");
           setPhase("error");
@@ -49,15 +54,10 @@ export default function CaseBulkResult({
         setPhase("done");
         onOpened();
       } catch {
-        if (!cancelled) {
-          setError("Не удалось открыть кейсы");
-          setPhase("error");
-        }
+        setError("Не удалось открыть кейсы");
+        setPhase("error");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [caseId, count, onOpened]);
 
   const sorted = useMemo(() => sortByRarity(results), [results]);
