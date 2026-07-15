@@ -308,29 +308,23 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
 
-        // Glow via radial gradients instead of canvas `shadowBlur`: shadowBlur redraws a
-        // blurred copy every frame, which is GPU/driver-heavy and can degrade the canvas over
-        // time on real hardware (flicker/colour artifacts a reload resets). Gradients are cheap
-        // and stable. A soft halo fading to transparent, then the pixel as a rounded block with
-        // a centre-out gradient.
+        // Soft shadow via a small radial gradient instead of canvas `shadowBlur`: shadowBlur
+        // redraws a blurred copy every frame, which is GPU/driver-heavy and can degrade the
+        // canvas over time on real hardware (flicker/colour artifacts a reload resets). The
+        // gradient only reaches a few px past the pixel edge, matching the old look. The pixel
+        // itself stays a crisp square.
         const cx = p.x + p.size / 2;
         const cy = p.y + p.size / 2;
 
-        const halo = p.size * 1.7;
-        const hg = ctx!.createRadialGradient(cx, cy, p.size * 0.25, cx, cy, halo);
-        hg.addColorStop(0, `hsla(${hue}, ${sat}%, ${Math.min(light + 8, 92)}%, ${shimmer * 0.3})`);
+        const halo = p.size / 2 + 4;
+        const hg = ctx!.createRadialGradient(cx, cy, p.size * 0.4, cx, cy, halo);
+        hg.addColorStop(0, `hsla(${hue}, ${sat}%, ${Math.min(light + 8, 92)}%, ${shimmer * 0.5})`);
         hg.addColorStop(1, `hsla(${hue}, ${sat}%, ${light}%, 0)`);
         ctx!.fillStyle = hg;
         ctx!.fillRect(cx - halo, cy - halo, halo * 2, halo * 2);
 
-        const r = p.size * 0.8;
-        const g = ctx!.createRadialGradient(cx, cy, 0, cx, cy, r);
-        g.addColorStop(0, `hsla(${hue}, ${sat}%, ${Math.min(light + 6, 94)}%, ${shimmer})`);
-        g.addColorStop(1, `hsla(${hue}, ${sat}%, ${light}%, ${shimmer * 0.25})`);
-        ctx!.fillStyle = g;
-        ctx!.beginPath();
-        ctx!.roundRect(p.x, p.y, p.size, p.size, p.size * 0.32);
-        ctx!.fill();
+        ctx!.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${shimmer})`;
+        ctx!.fillRect(p.x, p.y, p.size, p.size);
       }
       if (!reduced) raf = requestAnimationFrame(draw);
     }
