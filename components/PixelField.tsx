@@ -124,11 +124,11 @@ type Pixel = {
 };
 
 /**
- * Per-frame easing factor for morphing the current theme toward the target. Kept low so
- * the palette shifts gradually (a gentle ~3s morph) instead of lurching in the first frames,
- * which read as pixels "frantically" flickering through colors on a mode switch.
+ * Time constant (ms) for morphing the current theme toward the target. Applied against a
+ * clamped delta-time so the morph is a gentle ~3s and framerate-independent, instead of
+ * lurching (which read as pixels "frantically" flickering through colors on a mode switch).
  */
-const EASE = 0.013;
+const EASE_TAU = 1300;
 
 /** How many degrees a pixel's hue drifts around its fixed offset — small, just for life. */
 const HUE_SHIMMER_DEG = 7;
@@ -215,20 +215,20 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
     }
     window.addEventListener("resize", resize);
 
-    function easeTowardTarget() {
+    function easeTowardTarget(k: number) {
       const tg = targetRef.current;
-      cur.hueA = lerpAngle(cur.hueA, tg.hueA, EASE);
-      cur.hueSpan = lerp(cur.hueSpan, tg.hueSpan, EASE);
-      cur.satMin = lerp(cur.satMin, tg.satMin, EASE);
-      cur.satMax = lerp(cur.satMax, tg.satMax, EASE);
-      cur.lightMin = lerp(cur.lightMin, tg.lightMin, EASE);
-      cur.lightMax = lerp(cur.lightMax, tg.lightMax, EASE);
-      cur.moveSpeedMul = lerp(cur.moveSpeedMul, tg.moveSpeedMul, EASE);
-      cur.pulseSpeedMul = lerp(cur.pulseSpeedMul, tg.pulseSpeedMul, EASE);
-      cur.gridOpacity = lerp(cur.gridOpacity, tg.gridOpacity, EASE);
-      for (let i = 0; i < 3; i++) cur.bg[i] = lerp(cur.bg[i], tg.bg[i], EASE);
-      for (let i = 0; i < 4; i++) cur.gridA[i] = lerp(cur.gridA[i], tg.gridA[i], EASE);
-      for (let i = 0; i < 4; i++) cur.gridB[i] = lerp(cur.gridB[i], tg.gridB[i], EASE);
+      cur.hueA = lerpAngle(cur.hueA, tg.hueA, k);
+      cur.hueSpan = lerp(cur.hueSpan, tg.hueSpan, k);
+      cur.satMin = lerp(cur.satMin, tg.satMin, k);
+      cur.satMax = lerp(cur.satMax, tg.satMax, k);
+      cur.lightMin = lerp(cur.lightMin, tg.lightMin, k);
+      cur.lightMax = lerp(cur.lightMax, tg.lightMax, k);
+      cur.moveSpeedMul = lerp(cur.moveSpeedMul, tg.moveSpeedMul, k);
+      cur.pulseSpeedMul = lerp(cur.pulseSpeedMul, tg.pulseSpeedMul, k);
+      cur.gridOpacity = lerp(cur.gridOpacity, tg.gridOpacity, k);
+      for (let i = 0; i < 3; i++) cur.bg[i] = lerp(cur.bg[i], tg.bg[i], k);
+      for (let i = 0; i < 4; i++) cur.gridA[i] = lerp(cur.gridA[i], tg.gridA[i], k);
+      for (let i = 0; i < 4; i++) cur.gridB[i] = lerp(cur.gridB[i], tg.gridB[i], k);
     }
 
     function applyGrid() {
@@ -242,8 +242,16 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         `linear-gradient(90deg, rgba(${br | 0},${bg | 0},${bb | 0},${ba.toFixed(3)}) 1px, transparent 1px)`;
     }
 
-    function draw(t: number) {
-      easeTowardTarget();
+    // Own accumulated clock (ms). Delta is clamped so a throttled/backgrounded tab can't inject
+    // a huge time jump on return — that burst is what made colors race after switching tabs.
+    let clock = 0;
+    let lastNow = performance.now();
+
+    function draw(now: number) {
+      const dt = Math.min(50, Math.max(0, now - lastNow));
+      lastNow = now;
+      clock += dt;
+      easeTowardTarget(1 - Math.exp(-dt / EASE_TAU));
       applyGrid();
 
       ctx!.clearRect(0, 0, width, height);
@@ -258,13 +266,13 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
         if (p.y < -30) p.y = height + 30;
         if (p.y > height + 30) p.y = -30;
 
-        const shimmer = 0.35 + 0.25 * Math.sin(t * p.speedBase * cur.pulseSpeedMul + p.phase);
+        const shimmer = 0.35 + 0.25 * Math.sin(clock * p.speedBase * cur.pulseSpeedMul + p.phase);
         // Pixel sits at its fixed offset in the range and only drifts a few degrees, so it
         // never sweeps the whole palette (that read as "frantic" cycling on wide-range themes).
         const hueShimmer =
-          HUE_SHIMMER_DEG * Math.sin(t * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
+          HUE_SHIMMER_DEG * Math.sin(clock * p.hueSpeedBase * cur.pulseSpeedMul + p.huePhase);
         const hue = cur.hueA + cur.hueSpan * p.hueOffset + hueShimmer;
-        const lightMix = 0.5 + 0.5 * Math.sin(t * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
+        const lightMix = 0.5 + 0.5 * Math.sin(clock * p.lightSpeedBase * cur.pulseSpeedMul + p.lightPhase);
         const light = cur.lightMin + (cur.lightMax - cur.lightMin) * lightMix;
         const sat = cur.satMin + (cur.satMax - cur.satMin) * p.hueOffset;
 
@@ -278,7 +286,7 @@ export default function PixelField({ theme }: { theme: PixelThemeName }) {
     }
 
     raf = requestAnimationFrame(draw);
-    if (reduced) draw(0);
+    if (reduced) draw(lastNow);
 
     return () => {
       cancelAnimationFrame(raf);
