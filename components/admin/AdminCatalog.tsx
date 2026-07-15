@@ -17,6 +17,7 @@ type Item = {
   hidden: boolean;
   one_time_purchase: boolean;
   is_case: boolean;
+  grant_command: string | null;
   description: string;
   created_at: string;
 };
@@ -31,6 +32,7 @@ const emptyForm = {
   stock: "",
   oneTimePurchase: false,
   isCase: false,
+  grantCommand: "",
 };
 
 export default function AdminCatalog() {
@@ -91,6 +93,7 @@ export default function AdminCatalog() {
       stock: item.stock !== null ? String(item.stock) : "",
       oneTimePurchase: item.one_time_purchase,
       isCase: item.is_case,
+      grantCommand: item.grant_command ?? "",
     });
   };
 
@@ -117,6 +120,7 @@ export default function AdminCatalog() {
       stock: form.limited ? Number(form.stock) : null,
       oneTimePurchase: form.oneTimePurchase,
       isCase: form.isCase,
+      grantCommand: form.isCase ? null : form.grantCommand.trim() || null,
     };
 
     try {
@@ -271,6 +275,19 @@ export default function AdminCatalog() {
               Сохраните кейс, затем задайте его содержимое кнопкой «Содержимое» в таблице.
             </p>
           )}
+          {!form.isCase && (
+            <Field label="Команда выдачи через RCON (необязательно)">
+              <input
+                value={form.grantCommand}
+                onChange={(e) => setForm((f) => ({ ...f, grantCommand: e.target.value }))}
+                placeholder="lp user {player} parent add vip"
+                className="w-full border border-white/10 bg-black/30 px-3 py-2 font-[var(--font-mono)] text-xs text-white outline-none focus:border-cyan-400/60"
+              />
+              <span className="mt-1 block text-[11px] text-[var(--color-mist)]/70">
+                Используйте {"{player}"} для ника и {"{quantity}"} для количества.
+              </span>
+            </Field>
+          )}
 
           {error && <p className="text-sm text-rose-400">{error}</p>}
 
@@ -348,6 +365,9 @@ export default function AdminCatalog() {
                           )}
                           {item.is_case && (
                             <span className="border border-violet-400/40 px-2 py-1 text-xs text-violet-300">Кейс</span>
+                          )}
+                          {!item.is_case && item.grant_command && (
+                            <span className="border border-cyan-400/40 px-2 py-1 text-xs text-cyan-300">RCON</span>
                           )}
                         </div>
                       </td>

@@ -13,13 +13,22 @@ import { ITEM_TYPE_MAP, type ItemType } from "@/lib/itemType";
 import ItemIcon from "./ItemIcon";
 import type { CaseLootItem } from "./types";
 import { useAuth } from "@/lib/auth-context";
+import { formatRubleBalance } from "@/lib/rubleBalance";
 
 type OpenResult = {
-  won: { id: number; name: string; rarity: Rarity; itemType: ItemType; imageUrl: string | null };
+  won: {
+    id: number;
+    name: string;
+    rarity: Rarity;
+    itemType: ItemType;
+    imageUrl: string | null;
+    rubleAmountKopecks: number;
+  };
   items: CaseLootItem[];
   caseName: string;
   compensated: boolean;
   compensationAmount: number;
+  rubleAmountKopecks: number;
 };
 
 // Tile geometry (px). Kept in JS so the landing offset can be computed exactly.
@@ -44,7 +53,7 @@ export default function CaseRoulette({
   onClose: () => void;
   onOpened: () => void;
 }) {
-  const { user, setUser } = useAuth();
+  const { setUser } = useAuth();
   const [phase, setPhase] = useState<"loading" | "spinning" | "done" | "error">("loading");
   const [error, setError] = useState("");
   const [result, setResult] = useState<OpenResult | null>(null);
@@ -106,10 +115,19 @@ export default function CaseRoulette({
           caseName: data.caseName ?? caseName,
           compensated: Boolean(data.compensated),
           compensationAmount: Number(data.compensationAmount ?? 0),
+          rubleAmountKopecks: Number(data.rubleAmountKopecks ?? 0),
         });
-        if (user) {
-          setUser({ ...user, game_currency: Number(data.balance ?? user.game_currency) });
-        }
+        setUser((current) =>
+          current
+            ? {
+                ...current,
+                game_currency: Number(data.balance ?? current.game_currency),
+                balance_kopecks: Number(
+                  data.rubleBalanceKopecks ?? current.balance_kopecks
+                ),
+              }
+            : current
+        );
         setReel(strip);
         setPhase("spinning");
       } catch (err) {
@@ -117,7 +135,7 @@ export default function CaseRoulette({
         setPhase("error");
       }
     })();
-  }, [userCaseId, caseName, user, setUser]);
+  }, [userCaseId, caseName, setUser]);
 
   // Measure the viewport so we can centre the winning tile under the marker.
   useEffect(() => {
@@ -283,13 +301,22 @@ export default function CaseRoulette({
                       .
                     </p>
                   )}
+                  {result.rubleAmountKopecks > 0 && (
+                    <p className="mx-auto mt-4 max-w-md border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                      На ваш баланс зачислено{" "}
+                      <span className="font-semibold text-white">
+                        {formatRubleBalance(result.rubleAmountKopecks)}
+                      </span>
+                      .
+                    </p>
+                  )}
                 </div>
                 <div className="mt-6 flex justify-center">
                   <button
                     onClick={onClose}
                     className="pixel-corner bg-gradient-to-r from-violet-600 to-cyan-500 px-8 py-2.5 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.02]"
                   >
-                    {result.compensated ? "Закрыть" : "Забрать"}
+                    {result.compensated || result.rubleAmountKopecks > 0 ? "Закрыть" : "Забрать"}
                   </button>
                 </div>
               </div>

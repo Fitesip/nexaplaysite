@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { RARITIES } from "@/lib/rarity";
 import { ITEM_TYPES, isAlwaysUniqueItemType } from "@/lib/itemType";
 import { rarityChanceWarning } from "@/lib/caseRoll";
+import { normalizeGrantCommand, validateGrantCommand } from "@/lib/itemGrant";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -22,7 +23,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const pool = getPool();
   const [rows]: any = await pool.query(
-    `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency, weight, sort_order
+    `SELECT id, name, rarity, item_type, is_unique, image_url, price_currency, grant_command,
+            ruble_amount_kopecks, weight, sort_order
      FROM case_items
      WHERE case_id = ?
      ORDER BY sort_order ASC, id ASC`,
@@ -37,6 +39,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     isUnique: Boolean(r.is_unique),
     imageUrl: r.image_url,
     price: Number(r.price_currency),
+    grantCommand: r.grant_command,
+    rubleAmountKopecks: Number(r.ruble_amount_kopecks),
     weight: r.weight,
     chance: totalWeight > 0 ? r.weight / totalWeight : 0,
   }));
@@ -54,7 +58,22 @@ const schema = z.object({
         isUnique: z.boolean().default(false),
         imageUrl: z.string().trim().max(255).nullable().optional(),
         price: z.number().int("Стоимость должна быть целым числом").nonnegative("Стоимость не может быть отрицательной"),
+        grantCommand: z.string().trim().max(500).nullable().optional(),
+        rubleAmountKopecks: z.number().int().nonnegative().default(0),
         weight: z.number().int("Вес должен быть целым").positive("Вес должен быть больше 0"),
+      }).superRefine((item, ctx) => {
+        const grantCommand = item.itemType === "rubles" ? null : normalizeGrantCommand(item.grantCommand);
+        const grantCommandError = validateGrantCommand(grantCommand);
+        if (grantCommandError) {
+          ctx.addIssue({ code: "custom", path: ["grantCommand"], message: grantCommandError });
+        }
+        if (item.itemType === "rubles" && item.rubleAmountKopecks <= 0) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["rubleAmountKopecks"],
+            message: "Сумма рублёвой награды должна быть больше 0",
+          });
+        }
       })
     )
     .max(100),
@@ -79,7 +98,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
   const items = parsed.data.items.map((item) => ({
     ...item,
-    isUnique: isAlwaysUniqueItemType(item.itemType) || item.isUnique,
+    isUnique:
+      item.itemType !== "rubles" &&
+      (isAlwaysUniqueItemType(item.itemType) || item.isUnique),
+    grantCommand: item.itemType === "rubles" ? null : normalizeGrantCommand(item.grantCommand),
+    rubleAmountKopecks: item.itemType === "rubles" ? item.rubleAmountKopecks : 0,
   }));
 
   const pool = getPool();
@@ -103,8 +126,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       const it = items[i];
       await conn.query(
         `INSERT INTO case_items
-           (case_id, name, rarity, item_type, is_unique, image_url, price_currency, weight, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (case_id, name, rarity, item_type, is_unique, image_url, price_currency,
+            grant_command, ruble_amount_kopecks, weight, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           caseId,
           it.name,
@@ -113,6 +137,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           it.isUnique ? 1 : 0,
           it.imageUrl ?? null,
           it.price,
+          it.grantCommand,
+          it.rubleAmountKopecks,
           it.weight,
           i,
         ]

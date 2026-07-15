@@ -12,6 +12,7 @@ export type CaseLootItem = {
   itemType: ItemType;
   imageUrl: string | null;
   isUnique: boolean;
+  rubleAmountKopecks?: number;
 };
 
 /** A stack of identical unopened cases in the player's inventory. */
@@ -36,6 +37,7 @@ export type CaseHistoryEntry = {
   won_item_image: string | null;
   compensated: boolean;
   compensation_amount: number;
+  won_ruble_amount_kopecks: number;
   opened_at: string;
 };
 
@@ -61,4 +63,5 @@ export type BulkOpenResult = {
   imageUrl: string | null;
   compensated: boolean;
   compensationAmount: number;
+  rubleAmountKopecks: number;
 };

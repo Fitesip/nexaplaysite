@@ -254,10 +254,9 @@ export default function Profile({
           На сервере с {new Date(user.created_at).toLocaleDateString("ru-RU")}
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 text-left sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 text-left sm:grid-cols-3">
           <StatCard label="Баланс" value={formatRubleBalance(user.balance_kopecks)} />
-          <StatCard label="Игровая валюта" value={`${user.game_currency.toLocaleString("ru-RU")} монет`} />
-          <StatCard label="Заявок в поддержку" value="0" />
+          <StatCard label="Minecraft" value={user.minecraft_username ?? "Не привязан"} />
           <StatCard label="Статус" value={ROLE_LABEL[user.role]} />
         </div>
 

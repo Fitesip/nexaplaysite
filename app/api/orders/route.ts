@@ -5,6 +5,7 @@ import { getPool } from "@/lib/db";
 import { getCurrentUserId, requirePurchaseAccess } from "@/lib/auth";
 import { referralPurchaseRewardKopecks } from "@/lib/rubleBalance";
 import { sendToUser } from "@/lib/ws-hub";
+import { executeGrantCommand } from "@/lib/itemGrant";
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -101,15 +102,24 @@ export async function POST(req: NextRequest) {
     }
 
     const [buyerRows]: any = await conn.query(
-      "SELECT referred_by FROM users WHERE id = ?",
+      "SELECT referred_by, minecraft_username FROM users WHERE id = ?",
       [userId]
     );
     const referredBy = buyerRows[0]?.referred_by ? Number(buyerRows[0].referred_by) : null;
     const referrerId = referredBy && referredBy !== userId ? referredBy : null;
+    const minecraftUsername = buyerRows[0]?.minecraft_username as string | null;
+    if (!minecraftUsername) {
+      await conn.rollback();
+      return NextResponse.json(
+        { error: "Привяжите Minecraft-аккаунт перед покупкой" },
+        { status: 403 }
+      );
+    }
 
     const ids = items.map((i) => Number(i.id));
     const [catalogRows]: any = await conn.query(
-      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase, is_case
+      `SELECT id, name, category, game_mode, price_rub AS price, stock, hidden, one_time_purchase,
+              is_case, grant_command
        FROM catalog_items WHERE id IN (${ids.map(() => "?").join(",")}) FOR UPDATE`,
       ids
     );
@@ -140,6 +150,7 @@ export async function POST(req: NextRequest) {
       price: number;
       qty: number;
       is_case: boolean;
+      grant_command: string | null;
     }[] = [];
     let subtotal = 0;
 
@@ -178,6 +189,7 @@ export async function POST(req: NextRequest) {
         price: row.price,
         qty: item.qty,
         is_case: Boolean(row.is_case),
+        grant_command: row.grant_command,
       });
       subtotal += row.price * item.qty;
     }
@@ -263,6 +275,25 @@ export async function POST(req: NextRequest) {
           userId: referrerId,
           balanceKopecks: Number(balanceRows[0].balance_kopecks),
         };
+      }
+    }
+
+    for (const item of orderItems) {
+      if (!item.grant_command) continue;
+      const granted = await executeGrantCommand(
+        item.grant_command,
+        minecraftUsername,
+        item.qty
+      );
+      if (!granted) {
+        await conn.rollback();
+        return NextResponse.json(
+          {
+            error:
+              "Не удалось подключиться к RCON. Заказ не оформлен, товар и деньги не списаны.",
+          },
+          { status: 502 }
+        );
       }
     }
 

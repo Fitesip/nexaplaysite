@@ -24,6 +24,8 @@ type Row = {
   isUnique: boolean;
   imageUrl: string | null;
   price: string;
+  grantCommand: string;
+  rubleAmount: string;
   weight: string;
 };
 
@@ -34,6 +36,8 @@ type LoadedItem = {
   isUnique?: boolean;
   imageUrl?: string | null;
   price?: number;
+  grantCommand?: string | null;
+  rubleAmountKopecks?: number;
   weight: number;
 };
 
@@ -44,6 +48,8 @@ const emptyRow = (): Row => ({
   isUnique: false,
   imageUrl: null,
   price: "0",
+  grantCommand: "",
+  rubleAmount: "",
   weight: String(DEFAULT_RARITY_WEIGHT.common),
 });
 
@@ -76,9 +82,16 @@ export default function CaseLootEditor({
                 name: i.name,
                 rarity: i.rarity,
                 itemType: i.itemType ?? "item",
-                isUnique: isAlwaysUniqueItemType(i.itemType ?? "item") || Boolean(i.isUnique),
+                isUnique:
+                  i.itemType !== "rubles" &&
+                  (isAlwaysUniqueItemType(i.itemType ?? "item") || Boolean(i.isUnique)),
                 imageUrl: i.imageUrl ?? null,
                 price: String(i.price ?? 0),
+                grantCommand: i.grantCommand ?? "",
+                rubleAmount:
+                  i.itemType === "rubles" && i.rubleAmountKopecks
+                    ? String(i.rubleAmountKopecks / 100)
+                    : "",
                 weight: String(i.weight),
               }))
             : [emptyRow()]
@@ -113,7 +126,11 @@ export default function CaseLootEditor({
   const changeRarity = (idx: number, rarity: Rarity) =>
     update(idx, { rarity, weight: String(DEFAULT_RARITY_WEIGHT[rarity]) });
   const changeItemType = (idx: number, itemType: ItemType) =>
-    update(idx, { itemType, isUnique: isAlwaysUniqueItemType(itemType) });
+    update(idx, {
+      itemType,
+      isUnique: isAlwaysUniqueItemType(itemType),
+      ...(itemType === "rubles" ? { grantCommand: "", price: "0" } : {}),
+    });
   const removeRow = (idx: number) => setRows((prev) => prev.filter((_, i) => i !== idx));
 
   const uploadIcon = async (idx: number, file: File) => {
@@ -140,9 +157,14 @@ export default function CaseLootEditor({
         name: r.name.trim(),
         rarity: r.rarity,
         itemType: r.itemType,
-        isUnique: isAlwaysUniqueItemType(r.itemType) || r.isUnique,
+        isUnique:
+          r.itemType !== "rubles" &&
+          (isAlwaysUniqueItemType(r.itemType) || r.isUnique),
         imageUrl: r.imageUrl,
-        price: Number(r.price),
+        price: r.itemType === "rubles" ? 0 : Number(r.price),
+        grantCommand: r.itemType === "rubles" ? null : r.grantCommand.trim() || null,
+        rubleAmountKopecks:
+          r.itemType === "rubles" ? Math.round(Number(r.rubleAmount) * 100) : 0,
         weight: Number(r.weight),
       }))
       .filter((r) => r.name.length > 0);
@@ -154,6 +176,10 @@ export default function CaseLootEditor({
       }
       if (!Number.isInteger(it.price) || it.price < 0) {
         setError(`Некорректная стоимость у предмета «${it.name || "без названия"}» (нужно целое ≥ 0)`);
+        return;
+      }
+      if (it.itemType === "rubles" && (!Number.isInteger(it.rubleAmountKopecks) || it.rubleAmountKopecks <= 0)) {
+        setError(`Укажите положительную сумму в рублях у награды «${it.name || "без названия"}»`);
         return;
       }
     }
@@ -290,18 +316,34 @@ export default function CaseLootEditor({
                             className="w-20 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
                           />
                         </label>
-                        <label className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">
-                            Цена, монеты
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={row.price}
-                            onChange={(e) => update(idx, { price: e.target.value })}
-                            className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
-                          />
-                        </label>
+                        {row.itemType === "rubles" ? (
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">
+                              Сумма, ₽
+                            </span>
+                            <input
+                              type="number"
+                              min={0.01}
+                              step={0.01}
+                              value={row.rubleAmount}
+                              onChange={(e) => update(idx, { rubleAmount: e.target.value })}
+                              className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                            />
+                          </label>
+                        ) : (
+                          <label className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">
+                              Цена, монеты
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={row.price}
+                              onChange={(e) => update(idx, { price: e.target.value })}
+                              className="w-24 border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400/60"
+                            />
+                          </label>
+                        )}
                         <span className="flex flex-col gap-1">
                           <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">Шанс</span>
                           <span
@@ -311,7 +353,11 @@ export default function CaseLootEditor({
                             {chance.toFixed(chance < 0.01 && chance > 0 ? 2 : 1)}%
                           </span>
                         </span>
-                        {isAlwaysUniqueItemType(row.itemType) ? (
+                        {row.itemType === "rubles" ? (
+                          <span className="ml-auto font-[var(--font-mono)] text-xs text-emerald-300">
+                            зачисляется автоматически
+                          </span>
+                        ) : isAlwaysUniqueItemType(row.itemType) ? (
                           <span className="ml-auto font-[var(--font-mono)] text-xs text-cyan-300">
                             уникальный
                           </span>
@@ -330,6 +376,19 @@ export default function CaseLootEditor({
                           <span className="font-[var(--font-mono)] text-[10px] text-cyan-300">загрузка…</span>
                         )}
                       </div>
+                      {row.itemType !== "rubles" && (
+                        <label className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--color-mist)]">
+                            Команда выдачи через RCON (необязательно)
+                          </span>
+                          <input
+                            value={row.grantCommand}
+                            onChange={(e) => update(idx, { grantCommand: e.target.value })}
+                            placeholder="give {player} diamond {quantity}"
+                            className="w-full border border-white/10 bg-black/30 px-2 py-1.5 font-[var(--font-mono)] text-xs text-white outline-none focus:border-cyan-400/60"
+                          />
+                        </label>
+                      )}
                     </div>
                   );
                 })}
