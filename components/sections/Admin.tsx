@@ -12,15 +12,17 @@ import AdminCatalog from "@/components/admin/AdminCatalog";
 import AdminNews from "@/components/admin/AdminNews";
 import AdminRcon from "@/components/admin/AdminRcon";
 import AdminForum from "@/components/admin/AdminForum";
+import AdminPromocodes from "@/components/admin/AdminPromocodes";
 import { useAuth } from "@/lib/auth-context";
 
-type Tab = "support" | "users" | "catalog" | "news" | "rcon" | "moderation";
+type Tab = "support" | "users" | "catalog" | "news" | "promocodes" | "rcon" | "moderation";
 
 const TAB_LABEL: Record<Tab, string> = {
   support: "Поддержка",
   users: "Пользователи",
   catalog: "Каталог",
   news: "Новости",
+  promocodes: "Промокоды",
   rcon: "RCON",
   moderation: "Модерация",
 };
@@ -49,7 +51,7 @@ export default function Admin() {
   }
 
   const availableTabs: Tab[] = isAdmin
-    ? ["support", "moderation", "users", "catalog", "news", "rcon"]
+    ? ["support", "moderation", "users", "catalog", "news", "promocodes", "rcon"]
     : ["support", "moderation", "rcon"];
   const activeTab = tab && availableTabs.includes(tab) ? tab : availableTabs[0];
 
@@ -89,6 +91,7 @@ export default function Admin() {
         {activeTab === "users" && isAdmin && <AdminUsers myRole={me.role} myId={me.id} />}
         {activeTab === "catalog" && isAdmin && <AdminCatalog />}
         {activeTab === "news" && isAdmin && <AdminNews />}
+        {activeTab === "promocodes" && isAdmin && <AdminPromocodes />}
         {activeTab === "rcon" && <AdminRcon />}
       </div>
     </div>
