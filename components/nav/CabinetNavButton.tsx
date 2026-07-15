@@ -21,7 +21,7 @@ export default function CabinetNavButton({
       }`}
     >
       {user ? (
-        <Avatar user={user} size={32} className="text-[12px]" />
+        <Avatar user={user} size={16} className="text-[9px]" />
       ) : (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
           <circle cx="12" cy="8" r="3.4" />

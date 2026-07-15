@@ -51,54 +51,56 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {open && (
-        <div className="glass-panel pixel-corner absolute right-0 top-12 z-50 flex max-h-[70vh] w-80 flex-col overflow-hidden shadow-[0_0_30px_rgba(80,20,140,0.35)]">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <span className="font-[var(--font-display)] text-sm font-semibold text-white">Уведомления</span>
-            {unread > 0 && (
-              <button
-                onClick={markAllRead}
-                className="font-[var(--font-mono)] text-[11px] text-cyan-300 hover:text-cyan-200"
-              >
-                Прочитать всё
-              </button>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {items.length === 0 && (
-              <p className="px-4 py-6 text-center text-sm text-[var(--color-mist)]">Пока пусто</p>
-            )}
-            {items.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => {
-                  markRead(n.id);
-                  setOpen(false);
-                  goToLink(n.link);
-                }}
-                className={`flex w-full flex-col gap-0.5 border-b border-white/5 px-4 py-3 text-left transition-colors hover:bg-white/5 ${
-                  n.read ? "opacity-60" : ""
-                }`}
-              >
-                <span className="flex items-center gap-2 font-[var(--font-display)] text-xs font-semibold text-white">
-                  {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />}
-                  {n.title}
-                </span>
-                {n.body && <span className="text-xs text-[var(--color-mist)]">{n.body}</span>}
-                <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-mist)]/60">
-                  {new Date(n.created_at).toLocaleString("ru-RU", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </button>
-            ))}
-          </div>
+      <div
+        className={`glass-panel pixel-corner absolute right-0 top-12 z-50 flex max-h-[70vh] w-80 flex-col overflow-hidden shadow-[0_0_30px_rgba(80,20,140,0.35)] transition-all duration-200 ${
+          open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <span className="font-[var(--font-display)] text-sm font-semibold text-white">Уведомления</span>
+          {unread > 0 && (
+            <button
+              onClick={markAllRead}
+              className="font-[var(--font-mono)] text-[11px] text-cyan-300 hover:text-cyan-200"
+            >
+              Прочитать всё
+            </button>
+          )}
         </div>
-      )}
+
+        <div className="flex-1 overflow-y-auto">
+          {items.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-[var(--color-mist)]">Пока пусто</p>
+          )}
+          {items.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => {
+                markRead(n.id);
+                setOpen(false);
+                goToLink(n.link);
+              }}
+              className={`flex w-full flex-col gap-0.5 border-b border-white/5 px-4 py-3 text-left transition-colors hover:bg-white/5 ${
+                n.read ? "opacity-60" : ""
+              }`}
+            >
+              <span className="flex items-center gap-2 font-[var(--font-display)] text-xs font-semibold text-white">
+                {!n.read && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />}
+                {n.title}
+              </span>
+              {n.body && <span className="text-xs text-[var(--color-mist)]">{n.body}</span>}
+              <span className="font-[var(--font-mono)] text-[10px] text-[var(--color-mist)]/60">
+                {new Date(n.created_at).toLocaleString("ru-RU", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

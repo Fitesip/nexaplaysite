@@ -1,12 +1,9 @@
-/** POST/DELETE /api/auth/avatar — uploads (or removes) the user's profile picture to public/uploads/avatars. */
+/** POST/DELETE /api/auth/avatar — uploads (or removes) the user's profile picture. */
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import { mkdir, unlink, writeFile } from "fs/promises";
-import path from "path";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/auth";
+import { saveUploadedFile, deleteUploadedFile } from "@/lib/uploads";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
 const MAX_SIZE = 3 * 1024 * 1024; // 3MB
 const ALLOWED_TYPES: Record<string, string> = {
   "image/png": "png",
@@ -14,16 +11,6 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
-
-/** Removes a previously uploaded avatar file, ignoring "already gone" errors. */
-async function deleteIfLocalUpload(avatarUrl: string | null) {
-  if (!avatarUrl || !avatarUrl.startsWith("/uploads/avatars/")) return;
-  try {
-    await unlink(path.join(process.cwd(), "public", avatarUrl));
-  } catch {
-    /* file already missing — fine */
-  }
-}
 
 export async function POST(req: NextRequest) {
   const userId = await getCurrentUserId();
@@ -37,28 +24,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Файл не найден" }, { status: 400 });
   }
 
-  const ext = ALLOWED_TYPES[file.type];
-  if (!ext) {
-    return NextResponse.json({ error: "Поддерживаются только PNG, JPEG, WEBP и GIF" }, { status: 415 });
-  }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Файл слишком большой (максимум 3 МБ)" }, { status: 413 });
+  let saved;
+  try {
+    saved = await saveUploadedFile(file, "avatars", ALLOWED_TYPES, MAX_SIZE);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Не удалось сохранить файл" }, { status: 415 });
   }
 
   const pool = getPool();
   const [rows]: any = await pool.query("SELECT avatar_url FROM users WHERE id = ? LIMIT 1", [userId]);
   const previousAvatar = rows[0]?.avatar_url ?? null;
 
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  const filename = `${userId}-${randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(UPLOAD_DIR, filename), buffer);
+  await pool.query("UPDATE users SET avatar_url = ? WHERE id = ?", [saved.url, userId]);
+  await deleteUploadedFile(previousAvatar);
 
-  const avatarUrl = `/uploads/avatars/${filename}`;
-  await pool.query("UPDATE users SET avatar_url = ? WHERE id = ?", [avatarUrl, userId]);
-  await deleteIfLocalUpload(previousAvatar);
-
-  return NextResponse.json({ avatarUrl });
+  return NextResponse.json({ avatarUrl: saved.url });
 }
 
 export async function DELETE() {
@@ -72,7 +52,7 @@ export async function DELETE() {
   const previousAvatar = rows[0]?.avatar_url ?? null;
 
   await pool.query("UPDATE users SET avatar_url = NULL WHERE id = ?", [userId]);
-  await deleteIfLocalUpload(previousAvatar);
+  await deleteUploadedFile(previousAvatar);
 
   return NextResponse.json({ ok: true });
 }

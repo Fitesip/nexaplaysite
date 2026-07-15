@@ -165,3 +165,21 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
+
+/*
+ * Applied to individual chat/message bubbles in long, media-heavy scroll lists
+ * (support tickets in particular). `content-visibility: auto` tells the browser
+ * to skip layout and paint entirely for instances that are off-screen, instead
+ * of re-laying-out and re-painting every attached image/video in the whole
+ * thread on every scroll frame — that full-list recalculation is what caused
+ * the scroll to visibly stutter once several image-heavy messages were on the
+ * page, even ones nowhere near the viewport. `contain-intrinsic-size` gives the
+ * browser a placeholder height to reserve before an off-screen bubble has ever
+ * been measured, so the scrollbar doesn't jump around as bubbles come into view.
+ * Degrades gracefully (falls back to normal rendering) on browsers that don't
+ * support content-visibility yet.
+ */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}

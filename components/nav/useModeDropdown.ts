@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /**
  * Open/close state and viewport-relative positioning for the catalog's
@@ -37,8 +37,13 @@ export function useModeDropdown() {
     };
   }, [open]);
 
-  // keep the menu anchored under the trigger button while open, through resizes/scrolls
-  useEffect(() => {
+  // keep the menu anchored under the trigger button while open, through resizes/scrolls.
+  // useLayoutEffect (not useEffect) matters here: it runs before the browser paints, so
+  // the very first frame after opening already has the right anchor — with plain useEffect
+  // the panel would paint once at the stale {0,0} anchor and then visibly jump/slide to the
+  // correct spot a frame later (only ever looking right on the *second* open, once a real
+  // anchor value was already left over in state from the previous time it was open).
+  useLayoutEffect(() => {
     if (!open) return;
     const update = () => {
       const el = triggerRef.current;

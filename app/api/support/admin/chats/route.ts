@@ -1,4 +1,4 @@
-/** GET /api/support/admin/chats — lists every open support conversation, with unread counts, for staff. */
+/** GET /api/support/admin/chats — lists every user who has at least one ticket, with unread + open-ticket counts, for staff. */
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
@@ -25,9 +25,11 @@ export async function GET() {
       (SELECT created_at FROM support_messages sm
         WHERE sm.user_id = u.id ORDER BY sm.created_at DESC LIMIT 1) AS last_at,
       (SELECT COUNT(*) FROM support_messages sm
-        WHERE sm.user_id = u.id AND sm.sender_role = 'user' AND sm.read_by_admin = 0) AS unread
+        WHERE sm.user_id = u.id AND sm.sender_role = 'user' AND sm.read_by_admin = 0) AS unread,
+      (SELECT COUNT(*) FROM support_tickets st
+        WHERE st.user_id = u.id AND st.status = 'open') AS open_tickets
     FROM users u
-    WHERE EXISTS (SELECT 1 FROM support_messages sm WHERE sm.user_id = u.id)
+    WHERE EXISTS (SELECT 1 FROM support_tickets st WHERE st.user_id = u.id)
     ORDER BY last_at DESC
   `);
 

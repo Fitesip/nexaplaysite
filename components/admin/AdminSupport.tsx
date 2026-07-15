@@ -14,6 +14,7 @@ import ChatPanel from "./ChatPanel";
 export default function AdminSupport() {
   const { chats, loading, refresh: loadChats } = useAdminChats();
   const [activeUserId, setActiveUserId] = useState<number | null>(null);
+  const totalOpenTickets = chats.reduce((sum, c) => sum + c.open_tickets, 0);
 
   if (loading) {
     return <div className="text-center text-[var(--color-mist)]">Загрузка панели поддержки…</div>;
@@ -22,7 +23,9 @@ export default function AdminSupport() {
   return (
     <div>
       <p className="text-sm text-[var(--color-mist)]">
-        {chats.length === 0 ? "Пока никто не обращался в поддержку." : `Активных обращений: ${chats.length}`}
+        {chats.length === 0
+          ? "Пока никто не обращался в поддержку."
+          : `Пользователей с обращениями: ${chats.length} · открытых тикетов: ${totalOpenTickets}`}
       </p>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -52,6 +55,11 @@ export default function AdminSupport() {
                   {chat.last_sender_role === "admin" ? "Вы: " : ""}
                   {chat.last_message}
                 </p>
+                {chat.open_tickets > 0 && (
+                  <p className="mt-0.5 font-[var(--font-mono)] text-[10px] text-cyan-300/80">
+                    Открытых тикетов: {chat.open_tickets}
+                  </p>
+                )}
               </div>
             </button>
           ))}

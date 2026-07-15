@@ -7,7 +7,8 @@ export type NotificationType =
   | "forum_reaction"
   | "referral_joined"
   | "moderation"
-  | "support_reply";
+  | "support_reply"
+  | "support_ticket_closed";
 
 /**
  * Inserts a notification for `userId` and immediately pushes it over WebSocket to any

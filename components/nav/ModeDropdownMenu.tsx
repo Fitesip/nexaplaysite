@@ -24,10 +24,19 @@ export default function ModeDropdownMenu({
   return (
     <div
       ref={panelRef}
-      className={`glass-panel pixel-corner fixed z-[60] w-64 overflow-hidden border border-white/10 py-2 shadow-2xl transition-all duration-200 ${
-        open ? "pointer-events-auto translate-y-0 opacity-100" : "pointer-events-none -translate-y-1 opacity-0"
+      className={`glass-panel pixel-corner fixed z-[60] w-64 overflow-hidden border border-white/10 py-2 shadow-2xl transition-[opacity,transform] duration-200 ${
+        open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
-      style={{ top: anchor.top, left: anchor.left, transform: "translateX(-50%)" }}
+      style={{
+        top: anchor.top,
+        left: anchor.left,
+        // top/left are applied instantly (not transitioned) so the panel can never visibly
+        // slide/jump to its anchor — only opacity and this transform (which folds the
+        // open/closed slide offset into the same declaration as the horizontal centering;
+        // a separate Tailwind translate-y utility class here would do nothing, since this
+        // inline `transform` always wins over it) animate.
+        transform: `translateX(-50%) translateY(${open ? 0 : -4}px)`,
+      }}
     >
       {GAME_MODES.map((m) => (
         <button

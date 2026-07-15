@@ -1,10 +1,14 @@
-/** GET/POST /api/support/admin/chats/:userId/messages — staff view of one user's support conversation. */
+/**
+ * GET /api/support/admin/chats/:userId/messages — staff's merged view of one
+ * user's support history: every ticket they've ever opened, plus every
+ * message across all of them (each with its attachments). The client groups
+ * messages by `ticket_id` and renders a divider between ticket segments —
+ * see components/admin/ChatPanel.tsx. Replies are posted through
+ * /api/support/tickets/:id/messages instead of this route.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
-import { sendToUser, sendToStaff } from "@/lib/ws-hub";
-import { notify } from "@/lib/notify";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const admin = await requireStaff();
@@ -28,65 +32,39 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ use
     return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });
   }
 
-  const [messages] = await pool.query(
-    "SELECT id, sender_role, body, created_at FROM support_messages WHERE user_id = ? ORDER BY created_at ASC",
+  const [tickets]: any = await pool.query(
+    "SELECT id, subject, status, created_at, closed_at FROM support_tickets WHERE user_id = ? ORDER BY created_at ASC",
     [targetId]
   );
+
+  const [messages]: any = await pool.query(
+    "SELECT id, ticket_id, sender_role, body, created_at FROM support_messages WHERE user_id = ? ORDER BY created_at ASC",
+    [targetId]
+  );
+
+  const [attachmentRows]: any = messages.length
+    ? await pool.query(
+        `SELECT message_id, file_url AS url, file_name AS name, mime_type AS mime, size_bytes AS size
+         FROM support_attachments WHERE message_id IN (?)`,
+        [messages.map((m: any) => m.id)]
+      )
+    : [[]];
+
+  const attachmentsByMessage = new Map<number, any[]>();
+  for (const a of attachmentRows) {
+    const list = attachmentsByMessage.get(a.message_id) ?? [];
+    list.push({ url: a.url, name: a.name, mime: a.mime, size: a.size });
+    attachmentsByMessage.set(a.message_id, list);
+  }
+  const messagesWithAttachments = messages.map((m: any) => ({
+    ...m,
+    attachments: attachmentsByMessage.get(m.id) ?? [],
+  }));
 
   await pool.query(
     "UPDATE support_messages SET read_by_admin = 1 WHERE user_id = ? AND sender_role = 'user' AND read_by_admin = 0",
     [targetId]
   );
 
-  return NextResponse.json({ user: userRows[0], messages });
-}
-
-const schema = z.object({
-  message: z.string().trim().min(1, "Сообщение не может быть пустым").max(2000, "Слишком длинное сообщение"),
-});
-
-export async function POST(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
-  const admin = await requireStaff();
-  if (!admin) {
-    return NextResponse.json({ error: "Доступ только для сотрудников сервера" }, { status: 403 });
-  }
-
-  const { userId } = await params;
-  const targetId = Number(userId);
-  if (!Number.isInteger(targetId)) {
-    return NextResponse.json({ error: "Некорректный пользователь" }, { status: 400 });
-  }
-
-  const body = await req.json().catch(() => null);
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-  }
-
-  const pool = getPool();
-  const [result]: any = await pool.query(
-    `INSERT INTO support_messages (user_id, sender_role, sender_id, body, read_by_admin, read_by_user)
-     VALUES (?, 'admin', ?, ?, 1, 0)`,
-    [targetId, admin.id, parsed.data.message]
-  );
-
-  const [rows]: any = await pool.query(
-    "SELECT id, sender_role, body, created_at FROM support_messages WHERE id = ?",
-    [result.insertId]
-  );
-
-  sendToUser(targetId, { type: "support:admin_message", message: rows[0] });
-  sendToStaff({ type: "support:user_message", userId: targetId, message: rows[0] });
-
-  const excerpt = parsed.data.message.length > 90 ? `${parsed.data.message.slice(0, 90).trim()}…` : parsed.data.message;
-  await notify(pool, {
-    userId: targetId,
-    actorId: admin.id,
-    type: "support_reply",
-    title: "Ответ от поддержки",
-    body: excerpt,
-    link: "#cabinet",
-  });
-
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({ user: userRows[0], tickets, messages: messagesWithAttachments });
 }

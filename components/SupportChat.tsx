@@ -1,118 +1,49 @@
 "use client";
 
 /**
- * Floating support chat widget for logged-in users: a small bubble that opens
- * into a message thread with staff, backed by /api/support/messages and kept
- * live via the shared socket connection (with a polling fallback).
+ * Floating support widget for logged-in users. Entry point into the ticket
+ * system: opens on a "История обращений" list (components/support/TicketList),
+ * from which the user can start a new ticket (NewTicketForm) or reopen an
+ * existing one's conversation (TicketThread).
  */
-import { useEffect, useRef, useState, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useSocket } from "@/lib/socket-context";
+import TicketList from "@/components/support/TicketList";
+import NewTicketForm from "@/components/support/NewTicketForm";
+import TicketThread from "@/components/support/TicketThread";
 
-type Message = { id: number; sender_role: "user" | "admin"; body: string; created_at: string };
-
-const LAST_SEEN_KEY = "nexus_support_last_seen_reply";
+type View = { type: "list" } | { type: "new" } | { type: "thread"; id: number };
 
 export default function SupportChat() {
   const { subscribe } = useSocket();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
   const [collapsed, setCollapsed] = useState(true); // always starts collapsed
+  const [view, setView] = useState<View>({ type: "list" });
   const [hasNewReply, setHasNewReply] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const lastCountRef = useRef(0);
+  const [refreshSignal, setRefreshSignal] = useState(0);
 
-  // one-time history load — live messages also arrive over the socket after this,
-  // plus a light periodic resync below as a safety net
-  const loadHistory = () =>
-    fetch("/api/support/messages", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        const list: Message[] = data?.messages ?? [];
-        setMessages((prev) => {
-          // real (server-confirmed) messages always come from `list`, sorted as returned;
-          // any still-unconfirmed optimistic bubbles (negative id) stay appended after them
-          // until their own submit() call resolves and drops them
-          const stillPending = prev.filter((m) => m.id < 0);
-          return [...list, ...stillPending];
-        });
-        const lastAdmin = [...list].reverse().find((m) => m.sender_role === "admin");
-        const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) ?? 0);
-        if (lastAdmin && lastAdmin.id > lastSeen) setHasNewReply(true);
-      })
-      .finally(() => setLoading(false));
-
+  // light periodic check for any ticket with an unread admin reply, so the
+  // "Новый ответ" badge can show up even before the widget is ever opened
   useEffect(() => {
-    loadHistory();
-    // safety net: if a socket push were ever silently missed (dead connection,
-    // reconnect race), a light periodic resync means the chat catches up on its own
-    // instead of requiring a page reload.
-    const t = setInterval(loadHistory, 15_000);
+    const check = () =>
+      fetch("/api/support/tickets", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.tickets?.some((t: { unread: number }) => t.unread > 0)) setHasNewReply(true);
+        });
+    check();
+    const t = setInterval(check, 20_000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(
-    () =>
-      subscribe("support:admin_message", (payload: { message: Message }) => {
-        setMessages((m) => (m.some((x) => x.id === payload.message.id) ? m : [...m, payload.message]));
-        setHasNewReply(true);
-      }),
-    [subscribe]
-  );
-
-  useEffect(() => {
-    if (messages.length !== lastCountRef.current) {
-      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-      lastCountRef.current = messages.length;
-    }
-  }, [messages]);
+  // an admin reply on any ticket lights up the badge immediately
+  useEffect(() => subscribe("support:admin_message", () => setHasNewReply(true)), [subscribe]);
 
   const toggleOpen = () => {
     setCollapsed((c) => !c);
     if (collapsed) {
-      // opening — mark the latest admin reply as seen
-      const lastAdmin = [...messages].reverse().find((m) => m.sender_role === "admin");
-      if (lastAdmin) localStorage.setItem(LAST_SEEN_KEY, String(lastAdmin.id));
       setHasNewReply(false);
-    }
-  };
-
-  const submit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const input = form.elements.namedItem("message") as HTMLInputElement;
-    const text = input.value.trim();
-    if (!text) return;
-
-    setSending(true);
-    setError("");
-    // optimistic bubble so it feels instant
-    const optimistic: Message = {
-      id: -Date.now(),
-      sender_role: "user",
-      body: text,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((m) => [...m, optimistic]);
-    input.value = "";
-
-    try {
-      const res = await fetch("/api/support/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Не удалось отправить");
-      // drop the optimistic bubble and pull in the real (confirmed) message right away,
-      // instead of leaving it there until the next periodic resync
-      setMessages((m) => m.filter((x) => x.id !== optimistic.id));
-      await loadHistory();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка отправки");
-    } finally {
-      setSending(false);
+      setView({ type: "list" });
+      setRefreshSignal((s) => s + 1);
     }
   };
 
@@ -147,61 +78,31 @@ export default function SupportChat() {
 
       {!collapsed && (
         <div className="section-enter px-6 pb-6">
-          <p className="text-xs text-[var(--color-mist)]">
-            Напишите нам, если что-то не работает или остались вопросы — администратор ответит здесь.
-          </p>
-
-          <div
-            ref={listRef}
-            className="mt-4 flex h-72 flex-col gap-3 overflow-y-auto border border-white/10 bg-black/20 p-4"
-          >
-            {loading ? (
-              <p className="m-auto text-sm text-[var(--color-mist)]">Загрузка чата…</p>
-            ) : messages.length === 0 ? (
-              <p className="m-auto max-w-xs text-center text-sm text-[var(--color-mist)]">
-                Сообщений пока нет — напишите первым, и мы ответим как можно скорее.
-              </p>
-            ) : (
-              messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`section-enter max-w-[80%] px-3 py-2 text-sm leading-relaxed ${
-                    m.sender_role === "admin"
-                      ? "self-start border border-white/10 bg-white/5 text-[#eae7f5]"
-                      : "self-end bg-gradient-to-r from-violet-600 to-cyan-500 text-white"
-                  }`}
-                >
-                  <p>{m.body}</p>
-                  <p
-                    className={`mt-1 text-[10px] ${
-                      m.sender_role === "admin" ? "text-[var(--color-mist)]" : "text-white/70"
-                    }`}
-                  >
-                    {m.sender_role === "admin" ? "Администратор" : "Вы"} ·{" "}
-                    {new Date(m.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          {error && <p className="mt-2 text-sm text-rose-400">{error}</p>}
-
-          <form onSubmit={submit} className="mt-4 flex gap-2">
-            <input
-              name="message"
-              required
-              autoComplete="off"
-              placeholder="Опишите проблему…"
-              className="min-w-0 flex-1 border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none transition-colors duration-300 focus:border-cyan-400/60"
+          {view.type === "list" && (
+            <TicketList
+              refreshSignal={refreshSignal}
+              onOpenTicket={(id) => setView({ type: "thread", id })}
+              onNewTicket={() => setView({ type: "new" })}
             />
-            <button
-              disabled={sending}
-              className="pixel-corner shrink-0 bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.03] disabled:opacity-60"
-            >
-              Отправить
-            </button>
-          </form>
+          )}
+          {view.type === "new" && (
+            <NewTicketForm
+              onCancel={() => setView({ type: "list" })}
+              onCreated={(id) => {
+                setRefreshSignal((s) => s + 1);
+                setView({ type: "thread", id });
+              }}
+            />
+          )}
+          {view.type === "thread" && (
+            <TicketThread
+              ticketId={view.id}
+              onBack={() => {
+                setRefreshSignal((s) => s + 1);
+                setView({ type: "list" });
+              }}
+            />
+          )}
         </div>
       )}
     </div>

@@ -20,6 +20,7 @@ export type ChatSummary = {
   last_sender_role: "user" | "admin" | null;
   last_at: string | null;
   unread: number;
+  open_tickets: number;
 };
 
 type AdminChatsContextValue = {
@@ -63,7 +64,7 @@ export function AdminChatsProvider({ children }: { children: ReactNode }) {
 
   // any new message on any thread (from a user, or from a staff member on another tab)
   // updates that one row in place — instant, no round trip. Falls back to a full
-  // refresh only for a thread we don't have yet (e.g. a brand-new user's first message).
+  // refresh only for a thread we don't have yet (e.g. a brand-new user's first ticket).
   useEffect(() => {
     if (!isStaff) return;
     return subscribe(
@@ -74,6 +75,7 @@ export function AdminChatsProvider({ children }: { children: ReactNode }) {
         avatar_url?: string | null;
         minecraft_uuid?: string | null;
         minecraft_username?: string | null;
+        isNewTicket?: boolean;
         message: { id: number; sender_role: "user" | "admin"; body: string; created_at: string };
       }) => {
         setChats((prev) => {
@@ -92,6 +94,7 @@ export function AdminChatsProvider({ children }: { children: ReactNode }) {
             last_sender_role: payload.message.sender_role,
             last_at: payload.message.created_at,
             unread: payload.message.sender_role === "user" ? prev[idx].unread + 1 : prev[idx].unread,
+            open_tickets: prev[idx].open_tickets + (payload.isNewTicket ? 1 : 0),
           };
           const rest = prev.filter((_, i) => i !== idx);
           return [updated, ...rest];
@@ -99,6 +102,16 @@ export function AdminChatsProvider({ children }: { children: ReactNode }) {
       }
     );
   }, [isStaff, subscribe, refresh]);
+
+  // a ticket being closed changes that user's open-ticket count — bump the row in place
+  useEffect(() => {
+    if (!isStaff) return;
+    return subscribe("support:ticket_closed", (payload: { userId: number }) => {
+      setChats((prev) =>
+        prev.map((c) => (c.user_id === payload.userId ? { ...c, open_tickets: Math.max(0, c.open_tickets - 1) } : c))
+      );
+    });
+  }, [isStaff, subscribe]);
 
   // safety net: if a socket were ever silently dead for a while, don't leave the list
   // stale forever — a light periodic resync catches up regardless.
