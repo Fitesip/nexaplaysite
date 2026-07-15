@@ -18,6 +18,7 @@ function buildPacket(id: number, type: number, body: string): Buffer {
 }
 
 type ParsedPacket = { id: number; type: number; body: string; size: number };
+type RconResult = { output: string | null };
 
 function tryParsePacket(buf: Buffer): ParsedPacket | null {
   if (buf.length < 4) return null;
@@ -29,16 +30,14 @@ function tryParsePacket(buf: Buffer): ParsedPacket | null {
   return { id, type, body, size: 4 + size };
 }
 
-/**
- * Sends a single RCON command and returns the server's text response, or null if
- * RCON isn't configured (env vars missing) or the connection/auth failed.
- */
-export function sendRconCommand(command: string, timeoutMs = 4000): Promise<string | null> {
+function runRconRequest(command: string | null, timeoutMs: number): Promise<RconResult | null> {
   const host = process.env.RCON_HOST;
   const port = Number(process.env.RCON_PORT ?? 25575);
   const password = process.env.RCON_PASSWORD;
 
-  if (!host || !password) return Promise.resolve(null);
+  if (!host || !password || !Number.isInteger(port) || port < 1 || port > 65535) {
+    return Promise.resolve(null);
+  }
 
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -46,7 +45,7 @@ export function sendRconCommand(command: string, timeoutMs = 4000): Promise<stri
     let authed = false;
     let buffer = Buffer.alloc(0);
 
-    const finish = (result: string | null) => {
+    const finish = (result: RconResult | null) => {
       if (settled) return;
       settled = true;
       socket.destroy();
@@ -56,6 +55,7 @@ export function sendRconCommand(command: string, timeoutMs = 4000): Promise<stri
     socket.setTimeout(timeoutMs);
     socket.once("timeout", () => finish(null));
     socket.once("error", () => finish(null));
+    socket.once("close", () => finish(null));
 
     socket.connect(port, host, () => {
       socket.write(buildPacket(1, SERVERDATA_AUTH, password));
@@ -75,17 +75,35 @@ export function sendRconCommand(command: string, timeoutMs = 4000): Promise<stri
               return;
             }
             authed = true;
+            if (command === null) {
+              finish({ output: null });
+              return;
+            }
             socket.write(buildPacket(2, SERVERDATA_EXECCOMMAND, command));
           }
           continue;
         }
 
         // first response packet after auth is our command's output
-        finish(packet.body);
+        finish({ output: packet.body });
         return;
       }
     });
   });
+}
+
+/** Checks that the RCON socket can connect and authenticate successfully. */
+export async function checkRconConnection(timeoutMs = 4000): Promise<boolean> {
+  return (await runRconRequest(null, timeoutMs)) !== null;
+}
+
+/**
+ * Sends a single RCON command and returns the server's text response, or null if
+ * RCON isn't configured (env vars missing) or the connection/auth failed.
+ */
+export async function sendRconCommand(command: string, timeoutMs = 4000): Promise<string | null> {
+  const result = await runRconRequest(command, timeoutMs);
+  return result?.output ?? null;
 }
 
 /**
