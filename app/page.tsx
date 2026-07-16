@@ -6,6 +6,7 @@
  * and swaps in the matching background + section component.
  */
 import { useEffect, useState } from "react";
+import { useCart } from "@/lib/cart-context";
 import BackgroundStage, { type BgKey } from "@/components/BackgroundStage";
 import NavBar from "@/components/NavBar";
 import type { SectionId } from "@/components/sections";
@@ -33,9 +34,11 @@ const VALID_SECTIONS: SectionId[] = [
 ];
 
 export default function Page() {
+  const { clear } = useCart();
   const [active, setActive] = useState<SectionId>("home");
   const [mode, setMode] = useState<GameMode>("terryx");
   const [renderKey, setRenderKey] = useState(0);
+  const [paymentNotice, setPaymentNotice] = useState<"success" | "fail" | "invalid" | null>(null);
 
   // restore the section from the URL hash on load, so a refresh stays put
   useEffect(() => {
@@ -50,6 +53,16 @@ export default function Page() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "success" || payment === "fail" || payment === "invalid") {
+      setPaymentNotice(payment);
+      if (payment === "success") clear();
+      window.history.replaceState(null, "", window.location.hash || "#home");
+    }
+  }, [clear]);
 
   // re-trigger the enter animation every time the section changes
   useEffect(() => {
@@ -71,6 +84,30 @@ export default function Page() {
       <NavBar active={active} onChange={goTo} mode={mode} onSelectMode={setMode} />
 
       <div key={renderKey} className="section-enter mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-32 sm:px-6">
+        {paymentNotice && (
+          <div
+            className={`pixel-corner mb-6 border px-4 py-3 text-sm ${
+              paymentNotice === "success"
+                ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
+                : paymentNotice === "fail"
+                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                  : "border-rose-400/40 bg-rose-400/10 text-rose-200"
+            }`}
+          >
+            {paymentNotice === "success"
+              ? "Оплата принята. Заказ появится в истории после подтверждения платёжной системой."
+              : paymentNotice === "fail"
+                ? "Оплата отменена. Корзина сохранена — можно попробовать ещё раз."
+                : "Не удалось подтвердить подпись возврата Robokassa. Проверьте статус заказа в кабинете."}
+            <button
+              onClick={() => setPaymentNotice(null)}
+              className="float-right ml-4 text-current opacity-70 hover:opacity-100"
+              aria-label="Закрыть уведомление"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {active === "home" && <Home onNavigate={goTo} />}
         {active === "catalog" && <Catalog mode={mode} />}
         {active === "news" && <News />}

@@ -1,11 +1,22 @@
-/** POST /api/orders — creates an order from the cart (checkout); GET lists the user's past orders. */
+/**
+ * POST /api/orders — validates the cart and creates a *pending* order, then
+ * returns a Robokassa payment link. Nothing is granted here: stock, case drops,
+ * promo usage, referral rewards and RCON item grants only happen once the
+ * payment is confirmed by the Robokassa ResultURL callback (see
+ * `lib/orderFulfillment.ts`). GET lists the user's paid/cancelled orders.
+ */
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { getCurrentUserId, requirePurchaseAccess } from "@/lib/auth";
-import { referralPurchaseRewardKopecks } from "@/lib/rubleBalance";
+import { fulfillOrder } from "@/lib/orderFulfillment";
 import { sendToUser } from "@/lib/ws-hub";
-import { executeGrantCommand } from "@/lib/itemGrant";
+import {
+  buildPaymentUrl,
+  getRobokassaConfig,
+  isRobokassaConfigured,
+} from "@/lib/robokassa";
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -16,7 +27,7 @@ export async function GET() {
   const pool = getPool();
   const [orders]: any = await pool.query(
     `SELECT id, subtotal, discount_amount, total, promo_code, status, created_at
-     FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
+     FROM orders WHERE user_id = ? AND status <> 'pending' ORDER BY created_at DESC`,
     [userId]
   );
 
@@ -48,11 +59,16 @@ const schema = z.object({
   items: z
     .array(
       z.object({
-        id: z.union([z.string(), z.number()]),
+        id: z.union([z.string().regex(/^\d+$/), z.number().int().positive()]),
         qty: z.number().int().positive(),
       })
     )
-    .min(1, "Корзина пуста"),
+    .min(1, "Корзина пуста")
+    .refine(
+      (orderItems) =>
+        new Set(orderItems.map((item) => Number(item.id))).size === orderItems.length,
+      "Корзина содержит повторяющиеся товары"
+    ),
   promoCode: z.string().trim().min(1).optional(),
   requestId: z.string().uuid(),
 });
@@ -61,6 +77,33 @@ type DatabaseError = Error & { code?: string };
 
 function isDuplicateEntry(error: unknown): boolean {
   return error instanceof Error && (error as DatabaseError).code === "ER_DUP_ENTRY";
+}
+
+/** Builds the checkout response for an already-created pending order. */
+function pendingResponse(
+  order: {
+    id: number;
+    subtotal: number;
+    discount_amount: number;
+    total: number;
+    payment_token: string;
+  },
+  email?: string
+) {
+  const total = Number(order.total);
+  if (total <= 0) {
+    // Free order (100% promo) — nothing to charge; it is fulfilled directly.
+    return { free: true as const, order };
+  }
+  const cfg = getRobokassaConfig();
+  const paymentUrl = buildPaymentUrl(cfg, {
+    invId: order.id,
+    outSum: total,
+    description: `Оплата заказа №${order.id} на NexaPlay`,
+    email,
+    shp: { Shp_paymentToken: order.payment_token },
+  });
+  return { free: false as const, order, paymentUrl };
 }
 
 export async function POST(req: NextRequest) {
@@ -77,36 +120,50 @@ export async function POST(req: NextRequest) {
   }
   const { items, promoCode, requestId } = parsed.data;
 
+  if (!isRobokassaConfigured()) {
+    return NextResponse.json(
+      { error: "Приём платежей временно недоступен: платёжный шлюз не настроен" },
+      { status: 503 }
+    );
+  }
+
   const pool = getPool();
   const conn = await pool.getConnection();
-  let referrerBalanceUpdate: { userId: number; balanceKopecks: number } | null = null;
   try {
     await conn.beginTransaction();
 
+    // Idempotency: the same checkout request returns the same pending order.
     const [existingOrders]: any = await conn.query(
-      `SELECT id, subtotal, discount_amount, total
+      `SELECT id, subtotal, discount_amount, total, status, payment_token
        FROM orders
        WHERE user_id = ? AND checkout_request_id = ?
        LIMIT 1`,
       [userId, requestId]
     );
     if (existingOrders[0]) {
-      await conn.rollback();
-      return NextResponse.json({
-        ok: true,
-        orderId: existingOrders[0].id,
-        subtotal: existingOrders[0].subtotal,
-        discountAmount: existingOrders[0].discount_amount,
-        total: existingOrders[0].total,
-      });
+      await conn.commit();
+      const existing = existingOrders[0];
+      if (existing.status === "pending") {
+        const resp = pendingResponse(existing);
+        if (resp.free) {
+          const fulfilled = await fulfillFree(existing.id);
+          if (!fulfilled) {
+            return NextResponse.json(
+              { error: "Не удалось выдать бесплатный заказ через RCON. Попробуйте ещё раз." },
+              { status: 502 }
+            );
+          }
+          return NextResponse.json({ ok: true, orderId: existing.id, total: 0, paid: true });
+        }
+        return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paymentUrl: resp.paymentUrl });
+      }
+      return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paid: true });
     }
 
     const [buyerRows]: any = await conn.query(
-      "SELECT referred_by, minecraft_username FROM users WHERE id = ?",
+      "SELECT minecraft_username FROM users WHERE id = ?",
       [userId]
     );
-    const referredBy = buyerRows[0]?.referred_by ? Number(buyerRows[0].referred_by) : null;
-    const referrerId = referredBy && referredBy !== userId ? referredBy : null;
     const minecraftUsername = buyerRows[0]?.minecraft_username as string | null;
     if (!minecraftUsername) {
       await conn.rollback();
@@ -125,8 +182,6 @@ export async function POST(req: NextRequest) {
     );
     const catalogById = new Map<number, any>(catalogRows.map((r: any) => [r.id, r]));
 
-    // Which of the requested items are one-time-purchase — check those against this
-    // user's completed order history so the same account can't buy them twice.
     const oneTimeIds = catalogRows.filter((r: any) => r.one_time_purchase).map((r: any) => r.id);
     let alreadyOwnedIds = new Set<number>();
     if (oneTimeIds.length > 0) {
@@ -134,7 +189,7 @@ export async function POST(req: NextRequest) {
         `SELECT DISTINCT oi.catalog_item_id AS id
          FROM order_items oi
          JOIN orders o ON o.id = oi.order_id
-         WHERE o.user_id = ? AND o.status = 'completed' AND oi.catalog_item_id IN (${oneTimeIds
+         WHERE o.user_id = ? AND o.status IN ('pending', 'completed') AND oi.catalog_item_id IN (${oneTimeIds
            .map(() => "?")
            .join(",")})`,
         [userId, ...oneTimeIds]
@@ -225,110 +280,105 @@ export async function POST(req: NextRequest) {
     }
 
     const total = Math.max(0, subtotal - discountAmount);
-    const referralRewardKopecks = referrerId ? referralPurchaseRewardKopecks(total) : 0;
 
+    const paymentToken = randomUUID();
     const [orderResult]: any = await conn.query(
       `INSERT INTO orders
-         (user_id, subtotal, discount_amount, total, promo_code, checkout_request_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, subtotal, discountAmount, total, appliedCode, requestId]
+         (user_id, subtotal, discount_amount, total, promo_code, status, checkout_request_id, payment_token)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [userId, subtotal, discountAmount, total, appliedCode, requestId, paymentToken]
     );
     const orderId = orderResult.insertId;
 
     for (const item of orderItems) {
       await conn.query(
-        `INSERT INTO order_items (order_id, catalog_item_id, game_mode, name, category, price, qty)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [orderId, item.catalog_item_id, item.game_mode, item.name, item.category, item.price, item.qty]
+        `INSERT INTO order_items
+           (order_id, catalog_item_id, game_mode, name, category, price, qty, is_case_snapshot, grant_command_snapshot)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderId,
+          item.catalog_item_id,
+          item.game_mode,
+          item.name,
+          item.category,
+          item.price,
+          item.qty,
+          item.is_case,
+          item.grant_command,
+        ]
       );
-      // decrement stock only for items that track it
-      await conn.query(
-        `UPDATE catalog_items SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL`,
-        [item.qty, item.catalog_item_id]
-      );
-      // Кейсы падают в инвентарь пользователя: одна строка на каждый купленный экземпляр,
-      // чтобы каждый кейс открывался отдельно (со своей анимацией и выпавшим предметом).
-      if (item.is_case) {
-        for (let n = 0; n < item.qty; n++) {
-          await conn.query(
-            `INSERT INTO user_cases (user_id, case_id, case_name, game_mode)
-             VALUES (?, ?, ?, ?)`,
-            [userId, item.catalog_item_id, item.name, item.game_mode]
-          );
-        }
-      }
-    }
-
-    if (referrerId && referralRewardKopecks > 0) {
-      const [rewardResult]: any = await conn.query(
-        `UPDATE users
-         SET balance_kopecks = balance_kopecks + ?
-         WHERE id = ?`,
-        [referralRewardKopecks, referrerId]
-      );
-      if (rewardResult.affectedRows > 0) {
-        const [balanceRows]: any = await conn.query(
-          "SELECT balance_kopecks FROM users WHERE id = ?",
-          [referrerId]
-        );
-        referrerBalanceUpdate = {
-          userId: referrerId,
-          balanceKopecks: Number(balanceRows[0].balance_kopecks),
-        };
-      }
-    }
-
-    for (const item of orderItems) {
-      if (!item.grant_command) continue;
-      const granted = await executeGrantCommand(
-        item.grant_command,
-        minecraftUsername,
-        item.qty
-      );
-      if (!granted) {
-        await conn.rollback();
-        return NextResponse.json(
-          {
-            error:
-              "Не удалось подключиться к RCON. Заказ не оформлен, товар и деньги не списаны.",
-          },
-          { status: 502 }
+      if (item.catalog_item_id) {
+        await conn.query(
+          `UPDATE catalog_items SET stock = stock - ? WHERE id = ? AND stock IS NOT NULL`,
+          [item.qty, item.catalog_item_id]
         );
       }
     }
 
     await conn.commit();
 
-    if (referrerBalanceUpdate) {
-      sendToUser(referrerBalanceUpdate.userId, {
-        type: "balance_update",
-        data: { balanceKopecks: referrerBalanceUpdate.balanceKopecks },
-      });
+    if (total <= 0) {
+      // Free order — fulfill immediately, no gateway round-trip.
+      const fulfilled = await fulfillFree(orderId);
+      if (!fulfilled) {
+        return NextResponse.json(
+          { error: "Не удалось выдать бесплатный заказ через RCON. Попробуйте ещё раз." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json({ ok: true, orderId, subtotal, discountAmount, total: 0, paid: true }, { status: 201 });
     }
 
-    return NextResponse.json({ ok: true, orderId, subtotal, discountAmount, total }, { status: 201 });
+    const resp = pendingResponse({
+      id: orderId,
+      subtotal,
+      discount_amount: discountAmount,
+      total,
+      payment_token: paymentToken,
+    });
+    return NextResponse.json(
+      { ok: true, orderId, subtotal, discountAmount, total, paymentUrl: resp.free ? undefined : resp.paymentUrl },
+      { status: 201 }
+    );
   } catch (err) {
     await conn.rollback();
     if (isDuplicateEntry(err)) {
       const [existingOrders]: any = await pool.query(
-        `SELECT id, subtotal, discount_amount, total
+        `SELECT id, subtotal, discount_amount, total, status, payment_token
          FROM orders
          WHERE user_id = ? AND checkout_request_id = ?
          LIMIT 1`,
         [userId, requestId]
       );
       if (existingOrders[0]) {
-        return NextResponse.json({
-          ok: true,
-          orderId: existingOrders[0].id,
-          subtotal: existingOrders[0].subtotal,
-          discountAmount: existingOrders[0].discount_amount,
-          total: existingOrders[0].total,
-        });
+        const existing = existingOrders[0];
+        if (existing.status === "pending" && Number(existing.total) > 0) {
+          const cfg = getRobokassaConfig();
+          const paymentUrl = buildPaymentUrl(cfg, {
+            invId: existing.id,
+            outSum: Number(existing.total),
+            description: `Оплата заказа №${existing.id} на NexaPlay`,
+            shp: { Shp_paymentToken: existing.payment_token },
+          });
+          return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paymentUrl });
+        }
+        return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paid: true });
       }
     }
     throw err;
   } finally {
     conn.release();
   }
+}
+
+/** Fulfills a zero-total order right away (100% promo, no payment needed). */
+async function fulfillFree(orderId: number): Promise<boolean> {
+  const outcome = await fulfillOrder(orderId);
+  if (outcome.status === "fulfilled" && outcome.referrerBalanceUpdate) {
+    sendToUser(outcome.referrerBalanceUpdate.userId, {
+      type: "balance_update",
+      data: { balanceKopecks: outcome.referrerBalanceUpdate.balanceKopecks },
+    });
+  }
+  return outcome.status === "fulfilled" || outcome.status === "already";
 }

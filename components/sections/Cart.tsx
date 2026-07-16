@@ -2,8 +2,8 @@
 
 /**
  * The shopping cart page: line items (grouped/priced via lib/cart-context),
- * a promo-code field that validates against the server, and a mock checkout
- * that clears the cart and redeems the promo code (no real payment gateway).
+ * a promo-code field that validates against the server, and checkout through
+ * Robokassa. The cart is only cleared after a successful payment return.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart-context";
@@ -134,6 +134,10 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Не удалось оформить заказ");
+      if (data.paymentUrl) {
+        window.location.assign(data.paymentUrl);
+        return;
+      }
       clear();
       setPromo({ status: "idle" });
       setPromoInput("");
@@ -340,7 +344,7 @@ export default function Cart({ onNavigate }: { onNavigate: (id: SectionId) => vo
               disabled={checkingOut || needsMcLink}
               className="pixel-corner mt-6 w-full bg-gradient-to-r from-violet-600 to-cyan-500 py-3 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-violet)] transition-transform duration-300 hover:scale-[1.02] disabled:opacity-60"
             >
-              {checkingOut ? "Оформляем…" : "Оформить заказ"}
+              {checkingOut ? "Переходим к оплате…" : `Оплатить ${total} ₽`}
             </button>
           </div>
         </div>
