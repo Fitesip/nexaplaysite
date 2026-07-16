@@ -121,9 +121,14 @@ export default function Page() {
 
       <footer className="relative z-10 mt-auto border-t border-white/5 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm text-[var(--color-mist)]">
-            © {new Date().getFullYear()} NEXAPLAY — пиксельный мир без границ.
-          </p>
+          <div className="text-center text-[var(--color-mist)] sm:text-left">
+            <p className="text-sm">
+              © {new Date().getFullYear()} NEXAPLAY — пиксельный мир без границ.
+            </p>
+            <p className="mt-1 text-xs">
+              ИП Иванов Иван Иванович · ИНН 000000000000
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             <SocialLink href="https://t.me/" label="Telegram">
               <path d="M21.5 3.5 2.5 11.1c-1.1.44-1.1 1.06-.2 1.34l4.9 1.53 1.9 5.94c.24.66.42.92.86.92.34 0 .5-.16.7-.36l1.86-1.8 4.02 2.96c.74.4 1.28.2 1.46-.68l2.64-12.5c.28-1.1-.42-1.6-1.44-1.14Z" />
