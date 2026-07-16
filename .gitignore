@@ -1,0 +1,21 @@
+# dependencies
+/node_modules
+
+# Next.js output
+/.next
+/out
+
+# local environment files (keep the documented template)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# TypeScript cache
+*.tsbuildinfo
+
+# logs and OS/editor files
+*.log
+.DS_Store
+.idea
+.vscode
