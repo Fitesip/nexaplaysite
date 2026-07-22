@@ -17,7 +17,7 @@ type NewsItem = {
 const STATS = [
   { value: "67", label: "игроков онлайн за месяц" },
   { value: "4", label: "кастомных механики" },
-  { value: "3", label: "сезона с релиза" },
+  { value: "date", label: "дата запуска" },
 ];
 
 type Step = { title: string; text: string; action: SectionId | "copy" | null };
@@ -79,7 +79,7 @@ export default function Home({ onNavigate }: { onNavigate: (id: SectionId) => vo
       <section className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <p className="mb-4 font-[var(--font-mono)] text-xs uppercase tracking-[0.4em] text-cyan-300/80">
-            Ванильное выживание × кастомный лор
+            Выбор за тобой × История - тоже
           </p>
           <h1 className="font-[var(--font-display)] text-5xl font-bold leading-[1.05] sm:text-6xl">
             Мир, собранный
@@ -89,8 +89,7 @@ export default function Home({ onNavigate }: { onNavigate: (id: SectionId) => vo
             историй игроков.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--color-mist)]">
-            NEXAPLAY — сервер, где экономика держится на игроках, а не на донат-магазине.
-            Кланы, торговые пути, подземелья с авторскими боссами и честный PvP-баланс.
+            NEXAPLAY — сервер, где мир держится на игроках. Кланы, торговые пути, подземелья с авторскими боссами и неутолимая жажда приключений.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -111,7 +110,7 @@ export default function Home({ onNavigate }: { onNavigate: (id: SectionId) => vo
           <div className="mt-12 flex gap-10">
             {STATS.map((s) => (
               <div key={s.label}>
-                <div className="font-[var(--font-display)] text-2xl font-bold text-white">{s.value}</div>
+                <div className={`font-[var(--font-display)] text-white text-2xl font-bold ${s.value == "date" ? "blur-sm" : ""}`}>{s.value}</div>
                 <div className="mt-1 max-w-[9rem] text-xs text-[var(--color-mist)]">{s.label}</div>
               </div>
             ))}
@@ -200,7 +199,7 @@ export default function Home({ onNavigate }: { onNavigate: (id: SectionId) => vo
         {[
           { title: "Живая экономика", text: "Цены двигают игроки: аукционы, торговые гильдии, ярмарки." },
           { title: "Авторские подземелья", text: "Боссы и лабиринты, которых нет в ванильной игре." },
-          { title: "Честный PvP", text: "Регион-система и зоны безопасности без доната на силу." },
+          { title: "Честный PvP", text: "Полный запрет читов и сильный античит" },
         ].map((f) => (
           <div key={f.title} className="glass-panel pixel-corner p-6 transition-transform duration-300 hover:-translate-y-1">
             <h3 className="font-[var(--font-display)] text-lg font-semibold text-white">{f.title}</h3>

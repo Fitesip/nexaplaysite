@@ -1,9 +1,10 @@
 /**
  * Order fulfillment — everything that mutates state once an order is actually
  * paid: case drops into the inventory, referral reward and RCON item grants.
- * Stock and promo usage are reserved at checkout and released on FailURL. The
- * actual fulfillment runs from the Robokassa ResultURL callback, so nothing is
- * granted before the money arrives.
+ * Stock and promo usage are reserved at checkout and released by
+ * `releasePendingOrder` when the payment is cancelled. The actual fulfillment
+ * runs from the YooKassa webhook (once the payment status is confirmed
+ * server-side via the API), so nothing is granted before the money arrives.
  *
  * The whole fulfillment is one transaction and idempotent: only `pending` (or
  * a cancelled order later confirmed as paid) can be fulfilled. If an RCON
@@ -168,6 +169,55 @@ export async function fulfillOrder(orderId: number): Promise<FulfillOutcome> {
 
     await conn.commit();
     return { status: "fulfilled", referrerBalanceUpdate };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+/**
+ * Releases stock/promo reservations for an order whose payment was cancelled
+ * (buyer backed out, card declined, YooKassa `payment.canceled` webhook).
+ * Bound to the order via `paymentToken` so this can't be triggered for the
+ * wrong order. If a delayed webhook later confirms the same order as paid,
+ * `fulfillOrder` re-reserves stock/promo before granting anything.
+ */
+export async function releasePendingOrder(orderId: number, paymentToken: string): Promise<void> {
+  const pool = getPool();
+  const conn: PoolConnection = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [orderRows]: any = await conn.query(
+      `SELECT promo_code, status
+       FROM orders
+       WHERE id = ? AND payment_token = ?
+       FOR UPDATE`,
+      [orderId, paymentToken]
+    );
+    if (orderRows[0]?.status === "pending") {
+      const [items]: any = await conn.query(
+        `SELECT catalog_item_id, qty FROM order_items WHERE order_id = ?`,
+        [orderId]
+      );
+      for (const item of items) {
+        if (item.catalog_item_id !== null) {
+          await conn.query(
+            `UPDATE catalog_items SET stock = stock + ? WHERE id = ? AND stock IS NOT NULL`,
+            [item.qty, item.catalog_item_id]
+          );
+        }
+      }
+      if (orderRows[0].promo_code) {
+        await conn.query(
+          `UPDATE promocodes SET used_count = GREATEST(used_count - 1, 0) WHERE code = ?`,
+          [orderRows[0].promo_code]
+        );
+      }
+      await conn.query(`UPDATE orders SET status = 'cancelled' WHERE id = ?`, [orderId]);
+    }
+    await conn.commit();
   } catch (err) {
     await conn.rollback();
     throw err;

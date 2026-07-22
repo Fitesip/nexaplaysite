@@ -21,6 +21,7 @@ export default function AuthPanel({ onAuthed }: { onAuthed: (u: User) => void })
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [consent, setConsent] = useState(false);
   // bumping this remounts <Captcha>, forcing a fresh challenge after each attempt
   const [captchaKey, setCaptchaKey] = useState(0);
 
@@ -29,7 +30,7 @@ export default function AuthPanel({ onAuthed }: { onAuthed: (u: User) => void })
     setError("");
     setLoading(true);
     const form = e.currentTarget;
-    const payload: Record<string, string> = {
+    const payload: Record<string, string | boolean> = {
       username: (form.elements.namedItem("username") as HTMLInputElement).value,
       password: (form.elements.namedItem("password") as HTMLInputElement).value,
     };
@@ -37,6 +38,7 @@ export default function AuthPanel({ onAuthed }: { onAuthed: (u: User) => void })
       payload.email = (form.elements.namedItem("email") as HTMLInputElement).value;
       payload.captchaAnswer = (form.elements.namedItem("captchaAnswer") as HTMLInputElement).value;
       payload.captchaToken = (form.elements.namedItem("captchaToken") as HTMLInputElement).value;
+      payload.consent = consent;
       const ref = new URLSearchParams(window.location.search).get("ref");
       if (ref) payload.ref = ref;
     }
@@ -106,10 +108,34 @@ export default function AuthPanel({ onAuthed }: { onAuthed: (u: User) => void })
               <LabeledInput label="Пароль" name="password" type="password" required minLength={6} />
               {mode === "register" && <Captcha resetSignal={captchaKey} />}
 
+              {mode === "register" && (
+                <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--color-mist)]">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    required
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500"
+                  />
+                  <span>
+                    Я согласен(на) на обработку персональных данных в соответствии с{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.location.hash = "privacy";
+                      }}
+                      className="text-cyan-300 underline underline-offset-2 hover:text-cyan-200"
+                    >
+                      Политикой конфиденциальности
+                    </button>
+                  </span>
+                </label>
+              )}
+
               {error && <p className="text-sm text-rose-400">{error}</p>}
 
               <button
-                disabled={loading}
+                disabled={loading || (mode === "register" && !consent)}
                 className="pixel-corner mt-2 bg-gradient-to-r from-violet-600 to-cyan-500 py-3 font-[var(--font-display)] text-sm font-semibold text-white shadow-[var(--shadow-glow-cyan)] transition-transform duration-300 hover:scale-[1.02] disabled:opacity-60"
               >
                 {loading ? "Подождите…" : mode === "login" ? "Войти" : "Зарегистрироваться"}

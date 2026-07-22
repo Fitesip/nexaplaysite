@@ -15,7 +15,7 @@ export const GAME_MODES: GameModeMeta[] = [
   {
     id: "terryx",
     label: "Terryx",
-    tagline: "Выживание + PvP",
+    tagline: "Классика. Почти.",
     description:
       "Основной режим сервера: классическое выживание с честным PvP, приватами территорий и системой привилегий.",
     gradient: "linear-gradient(135deg, #a855f7, #22d3ee)",
@@ -26,27 +26,27 @@ export const GAME_MODES: GameModeMeta[] = [
     label: "Bloodborne",
     tagline: "Анархия",
     description:
-      "Мир без правил: PvP везде, гриферство разрешено, приватов нет. Побеждает тот, кто сильнее и хитрее.",
+      "Анархия как она есть. Нет привелегий, минимум правил, нет границ.",
     gradient: "linear-gradient(135deg, #ef4444, #7f1d1d)",
     accent: "#ef4444",
   },
   {
     id: "heaven",
     label: "Heaven",
-    tagline: "RolePlay + моды",
+    tagline: "Рай? + Моды",
     description:
-      "Ролевой режим с модификациями: своя экономика, профессии и отыгрыш персонажа в проработанном мире.",
+      "RolePlay который Вы вряд ли где-то видели. Почему рай? Ну сами решите, рай ли это.",
     gradient: "linear-gradient(135deg, #f8fafc, #84cc16)",
     accent: "#a3e635",
   },
-  {
-    id: "games",
-    label: "Games",
-    tagline: "Мини-игры",
-    description: "Подборка мини-игр: от классики до авторских режимов — заходи в лобби и выбирай, во что играть.",
-    gradient: "linear-gradient(135deg, #facc15, #22d3ee)",
-    accent: "#facc15",
-  },
+  // {
+  //   id: "games",
+  //   label: "Games",
+  //   tagline: "Мини-игры",
+  //   description: "Подборка мини-игр: от классики до авторских режимов — заходи в лобби и выбирай, во что играть.",
+  //   gradient: "linear-gradient(135deg, #facc15, #22d3ee)",
+  //   accent: "#facc15",
+  // },
 ];
 
 export const GAME_MODE_MAP: Record<GameMode, GameModeMeta> = Object.fromEntries(

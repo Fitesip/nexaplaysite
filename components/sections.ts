@@ -8,4 +8,5 @@ export type SectionId =
   | "faq"
   | "cabinet"
   | "cart"
-  | "admin";
+  | "admin"
+  | "privacy";

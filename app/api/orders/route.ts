@@ -1,9 +1,9 @@
 /**
  * POST /api/orders — validates the cart and creates a *pending* order, then
- * returns a Robokassa payment link. Nothing is granted here: stock, case drops,
- * promo usage, referral rewards and RCON item grants only happen once the
- * payment is confirmed by the Robokassa ResultURL callback (see
- * `lib/orderFulfillment.ts`). GET lists the user's paid/cancelled orders.
+ * returns a YooKassa payment link (confirmation_url). Nothing is granted
+ * here: stock, case drops, promo usage, referral rewards and RCON item
+ * grants only happen once the payment is confirmed by the YooKassa webhook
+ * (see `lib/orderFulfillment.ts`). GET lists the user's paid/cancelled orders.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
@@ -12,11 +12,7 @@ import { getPool } from "@/lib/db";
 import { getCurrentUserId, requirePurchaseAccess } from "@/lib/auth";
 import { fulfillOrder } from "@/lib/orderFulfillment";
 import { sendToUser } from "@/lib/ws-hub";
-import {
-  buildPaymentUrl,
-  getRobokassaConfig,
-  isRobokassaConfigured,
-} from "@/lib/robokassa";
+import { createPayment, getYookassaConfig, isYookassaConfigured } from "@/lib/yookassa";
 
 export async function GET() {
   const userId = await getCurrentUserId();
@@ -79,8 +75,13 @@ function isDuplicateEntry(error: unknown): boolean {
   return error instanceof Error && (error as DatabaseError).code === "ER_DUP_ENTRY";
 }
 
-/** Builds the checkout response for an already-created pending order. */
-function pendingResponse(
+/**
+ * Creates a YooKassa payment for an already-created pending order and
+ * returns the checkout response. Each call is a fresh payment attempt (its
+ * own Idempotence-Key), so a retried checkout never reuses a stale/expired
+ * confirmation_url from an earlier attempt.
+ */
+async function pendingResponse(
   order: {
     id: number;
     subtotal: number;
@@ -88,6 +89,7 @@ function pendingResponse(
     total: number;
     payment_token: string;
   },
+  origin: string,
   email?: string
 ) {
   const total = Number(order.total);
@@ -95,14 +97,21 @@ function pendingResponse(
     // Free order (100% promo) — nothing to charge; it is fulfilled directly.
     return { free: true as const, order };
   }
-  const cfg = getRobokassaConfig();
-  const paymentUrl = buildPaymentUrl(cfg, {
-    invId: order.id,
+  const cfg = getYookassaConfig();
+  const returnUrl = `${origin}/api/payments/yookassa/return?orderId=${order.id}`;
+  const payment = await createPayment(cfg, {
+    orderId: order.id,
     outSum: total,
     description: `Оплата заказа №${order.id} на NexaPlay`,
+    returnUrl,
     email,
-    shp: { Shp_paymentToken: order.payment_token },
+    paymentToken: order.payment_token,
+    idempotenceKey: randomUUID(),
   });
+  const paymentUrl = payment.confirmation?.confirmation_url;
+  if (!paymentUrl) {
+    throw new Error(`YooKassa payment ${payment.id} has no confirmation_url`);
+  }
   return { free: false as const, order, paymentUrl };
 }
 
@@ -120,13 +129,19 @@ export async function POST(req: NextRequest) {
   }
   const { items, promoCode, requestId } = parsed.data;
 
-  if (!isRobokassaConfigured()) {
+  if (!isYookassaConfigured()) {
     return NextResponse.json(
       { error: "Приём платежей временно недоступен: платёжный шлюз не настроен" },
       { status: 503 }
     );
   }
 
+  // Prefer an explicit public URL over the request's Host header: behind a
+  // reverse proxy that doesn't forward the original Host (a common default),
+  // req.nextUrl.origin resolves to the app's internal bind address (e.g.
+  // localhost:8000) instead of the public domain, and YooKassa's "Вернуться
+  // в магазин" button would send buyers there instead of nexaplay.pro.
+  const origin = process.env.SITE_URL ?? req.nextUrl.origin;
   const pool = getPool();
   const conn = await pool.getConnection();
   try {
@@ -144,7 +159,7 @@ export async function POST(req: NextRequest) {
       await conn.commit();
       const existing = existingOrders[0];
       if (existing.status === "pending") {
-        const resp = pendingResponse(existing);
+        const resp = await pendingResponse(existing, origin);
         if (resp.free) {
           const fulfilled = await fulfillFree(existing.id);
           if (!fulfilled) {
@@ -329,13 +344,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, orderId, subtotal, discountAmount, total: 0, paid: true }, { status: 201 });
     }
 
-    const resp = pendingResponse({
-      id: orderId,
-      subtotal,
-      discount_amount: discountAmount,
-      total,
-      payment_token: paymentToken,
-    });
+    const resp = await pendingResponse(
+      {
+        id: orderId,
+        subtotal,
+        discount_amount: discountAmount,
+        total,
+        payment_token: paymentToken,
+      },
+      origin
+    );
     return NextResponse.json(
       { ok: true, orderId, subtotal, discountAmount, total, paymentUrl: resp.free ? undefined : resp.paymentUrl },
       { status: 201 }
@@ -353,14 +371,13 @@ export async function POST(req: NextRequest) {
       if (existingOrders[0]) {
         const existing = existingOrders[0];
         if (existing.status === "pending" && Number(existing.total) > 0) {
-          const cfg = getRobokassaConfig();
-          const paymentUrl = buildPaymentUrl(cfg, {
-            invId: existing.id,
-            outSum: Number(existing.total),
-            description: `Оплата заказа №${existing.id} на NexaPlay`,
-            shp: { Shp_paymentToken: existing.payment_token },
+          const resp = await pendingResponse(existing, origin);
+          return NextResponse.json({
+            ok: true,
+            orderId: existing.id,
+            total: existing.total,
+            paymentUrl: resp.free ? undefined : resp.paymentUrl,
           });
-          return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paymentUrl });
         }
         return NextResponse.json({ ok: true, orderId: existing.id, total: existing.total, paid: true });
       }

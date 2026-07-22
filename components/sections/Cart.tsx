@@ -3,7 +3,9 @@
 /**
  * The shopping cart page: line items (grouped/priced via lib/cart-context),
  * a promo-code field that validates against the server, and checkout through
- * Robokassa. The cart is only cleared after a successful payment return.
+ * YooKassa. The cart is only cleared once the payment is confirmed (status
+ * "success" from the return route reflects the order's DB state, not just
+ * the browser bouncing back).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/cart-context";
